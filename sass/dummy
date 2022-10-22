@@ -1,0 +1,95 @@
+
+Fatbin elf code:
+================
+arch = sm_80
+code version = [1,7]
+host = linux
+compile_size = 64bit
+
+	code for sm_80
+
+Fatbin elf code:
+================
+arch = sm_80
+code version = [1,7]
+host = linux
+compile_size = 64bit
+
+	code for sm_80
+		Function : _Z5dummyPi
+	.headerflags    @"EF_CUDA_SM80 EF_CUDA_PTX_SM(EF_CUDA_SM80)"
+        /*0000*/                   MOV R1, c[0x0][0x28] ;                             /* 0x00000a0000017a02 */
+                                                                                      /* 0x000fc40000000f00 */
+        /*0010*/                   S2R R5, SR_TID.X ;                                 /* 0x0000000000057919 */
+                                                                                      /* 0x000e220000002100 */
+        /*0020*/                   HFMA2.MMA R2, -RZ, RZ, 0, 2.384185791015625e-07 ;  /* 0x00000004ff027435 */
+                                                                                      /* 0x000fe200000001ff */
+        /*0030*/                   ULDC.64 UR4, c[0x0][0x118] ;                       /* 0x0000460000047ab9 */
+                                                                                      /* 0x000fd20000000a00 */
+        /*0040*/                   IMAD.WIDE.U32 R2, R5, R2, c[0x0][0x160] ;          /* 0x0000580005027625 */
+                                                                                      /* 0x001fca00078e0002 */
+        /*0050*/                   STG.E [R2.64], R5 ;                                /* 0x0000000502007986 */
+                                                                                      /* 0x000fe2000c101904 */
+        /*0060*/                   EXIT ;                                             /* 0x000000000000794d */
+                                                                                      /* 0x000fea0003800000 */
+        /*0070*/                   BRA 0x70;                                          /* 0xfffffff000007947 */
+                                                                                      /* 0x000fc0000383ffff */
+        /*0080*/                   NOP;                                               /* 0x0000000000007918 */
+                                                                                      /* 0x000fc00000000000 */
+        /*0090*/                   NOP;                                               /* 0x0000000000007918 */
+                                                                                      /* 0x000fc00000000000 */
+        /*00a0*/                   NOP;                                               /* 0x0000000000007918 */
+                                                                                      /* 0x000fc00000000000 */
+        /*00b0*/                   NOP;                                               /* 0x0000000000007918 */
+                                                                                      /* 0x000fc00000000000 */
+        /*00c0*/                   NOP;                                               /* 0x0000000000007918 */
+                                                                                      /* 0x000fc00000000000 */
+        /*00d0*/                   NOP;                                               /* 0x0000000000007918 */
+                                                                                      /* 0x000fc00000000000 */
+        /*00e0*/                   NOP;                                               /* 0x0000000000007918 */
+                                                                                      /* 0x000fc00000000000 */
+        /*00f0*/                   NOP;                                               /* 0x0000000000007918 */
+                                                                                      /* 0x000fc00000000000 */
+		..........
+
+
+
+Fatbin ptx code:
+================
+arch = sm_80
+code version = [7,7]
+host = linux
+compile_size = 64bit
+compressed
+
+
+
+
+
+
+
+
+.version 7.7
+.target sm_80
+.address_size 64
+
+
+
+.visible .entry _Z5dummyPi(
+.param .u64 _Z5dummyPi_param_0
+)
+{
+.reg .b32 %r<2>;
+.reg .b64 %rd<5>;
+
+
+ld.param.u64 %rd1, [_Z5dummyPi_param_0];
+cvta.to.global.u64 %rd2, %rd1;
+mov.u32 %r1, %tid.x;
+mul.wide.u32 %rd3, %r1, 4;
+add.s64 %rd4, %rd2, %rd3;
+st.global.u32 [%rd4], %r1;
+ret;
+
+}
+
