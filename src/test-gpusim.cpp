@@ -1,5 +1,19 @@
 #include<cstdio>
+#include<cassert>
 #include<driver_types.h>
+#include<unistd.h>
+#include<cstdlib>
+#include<iostream>
+#include<fstream>
+#include<sstream>
+#include<map>
+#include<cstdint>
+
+#define __my_func__ __func__
+
+std::string ptx_buffer;
+std::map<uint64_t,std::string>func2name;
+dim3 _gridDim,_blockDim;
 
 extern "C" {
 
@@ -7,7 +21,49 @@ void** __cudaRegisterFatBinary(
     void *fatCubin
 )
 {
-    printf("call __cudaRegisterFatBinary\n",fatCubin);
+    printf("EMU: call %s\n",__my_func__);
+
+    static bool if_executed = 0;
+
+    if(!if_executed){
+        if_executed = 1;
+        // get program abspath 
+        char self_exe_path[1025] = "";
+        long size = readlink("/proc/self/exe",self_exe_path,1024);
+        assert(size!=-1);
+        self_exe_path[size] = '\0';
+        printf("EMU: self exe links to %s\n",self_exe_path);
+
+        // get ptx file name embedded in binary
+        char cmd[1024] = "";
+        snprintf(cmd,1024,"cuobjdump -lptx %s | cut -d : -f 2 | awk '{$1=$1}1' > %s",self_exe_path,"__ptx_list__");
+        if(system(cmd)!=0){
+            printf("EMU: fail to execute %s\n",cmd);
+            exit(0);
+        }
+
+        // get ptx embedded in binary
+        std::ifstream infile("__ptx_list__");
+        std::string ptx_file;
+        while(std::getline(infile,ptx_file)){
+            printf("EMU: extract PTX file %s \n",ptx_file.c_str());
+            snprintf(cmd,1024,"cuobjdump -xptx %s %s >/dev/null",ptx_file.c_str(),self_exe_path);
+            if(system(cmd)!=0){
+                printf("EMU: fail to execute %s\n",cmd);
+                exit(0);
+            }
+            std::ifstream if_ptx(ptx_file);
+            std::ostringstream of_ptx;
+            char ch;
+            while(of_ptx && if_ptx.get(ch)) of_ptx.put(ch);
+            ptx_buffer = of_ptx.str();
+            break;
+        }
+
+        // clean intermediate file
+        snprintf(cmd,1024,"rm __ptx_list__ %s",ptx_file.c_str());
+        system(cmd);
+    }
     return nullptr;
 }
 
@@ -24,14 +80,18 @@ void __cudaRegisterFunction(
         int     *wSize
 )
 {
-    printf("call __cudaRegisterFunction\n");
+    printf("EMU: call %s\n",__my_func__);
+    printf("EMU: hostFun %p\n",hostFun);
+    printf("EMU: deviceFun %p\n",deviceFun);
+    printf("EMU: deviceFunName %s\n",deviceName);
+    func2name[(uint64_t)hostFun] = *(new std::string(deviceName));
 }
 
 void __cudaRegisterFatBinaryEnd(
     void **fatCubinHandle
 )
 {
-    printf("call __cudaRegisterFatBinaryEnd\n");
+    printf("EMU: call %s\n",__my_func__);
 }
 
 cudaError_t cudaMalloc(
@@ -39,7 +99,7 @@ cudaError_t cudaMalloc(
     size_t s
 )
 {
-    printf("call cudaMalloc\n");
+    printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
 
@@ -50,7 +110,7 @@ cudaError_t cudaMemcpy(
     enum cudaMemcpyKind kind
 )
 {
-    printf("call cudaMemcpy\n");
+    printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
 
@@ -59,7 +119,7 @@ cudaError_t cudaEventCreate(
     unsigned int  flags
 )
 {
-    printf("call cudaEventCreate\n");
+    printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
 
@@ -68,7 +128,7 @@ cudaError_t cudaEventRecord(
     cudaStream_t stream
 )
 {
-    printf("call cudaEventRecord\n");
+    printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
 
@@ -79,7 +139,11 @@ unsigned __cudaPushCallConfiguration(
     struct CUstream_st *stream = 0
 )
 {
-    printf("call __cudaPushCallConfiguration\n");
+    printf("EMU: call %s\n",__my_func__);
+    printf("EMU: gridDim(%d,%d,%d)\n",gridDim.x,gridDim.y,gridDim.z);
+    printf("EMU: blockDim(%d,%d,%d)\n",blockDim.x,blockDim.y,blockDim.z);
+    _gridDim = gridDim;
+    _blockDim = blockDim;
     return 0;
 }
 
@@ -87,7 +151,7 @@ cudaError_t cudaEventSynchronize(
     cudaEvent_t event
 )
 {
-    printf("call cudaEventSynchronize\n");
+    printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
 
@@ -97,7 +161,7 @@ cudaError_t cudaEventElapsedTime(
     cudaEvent_t  end
 )
 {
-    printf("call cudaEventElapsedTime\n");
+    printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
 
@@ -105,7 +169,7 @@ cudaError_t cudaFree(
     void *devPtr
 )
 {
-    printf("call cudaFree\n");
+    printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
 
@@ -113,7 +177,7 @@ void __cudaUnregisterFatBinary(
     void **fatCubinHandle
 )
 {
-    printf("call __cudaUnregisterFatBinary\n");
+    printf("EMU: call %s\n",__my_func__);
 }
 
 cudaError_t __cudaPopCallConfiguration(
@@ -123,7 +187,7 @@ cudaError_t __cudaPopCallConfiguration(
   void         *stream
 )
 {
-    printf("call __cudaPopCallConfiguration\n");
+    printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
 
@@ -135,9 +199,26 @@ cudaError_t cudaLaunchKernel(
     size_t       sharedMem, 
     cudaStream_t stream
 ){
-    printf("call cudaLaunchKernel\n");
+    printf("EMU: call %s\n",__my_func__);
+    //printf("%s\n",ptx_buffer.c_str());
+    printf("EMU: deviceFunName %s\n",func2name[(uint64_t)func].c_str());
+    printf("EMU: arg %p\n",args);
     return cudaSuccess;
 }
 
+void __cudaRegisterVar(
+    void      **fatCubinHandle,
+    char       *hostVar,           
+    char       *deviceAddress,     
+    const char *deviceName,  
+    int         ext, 
+    int         size, 
+    int         constant, 
+    int         global
+) 
+{
+    printf("EMU: call %s\n",__my_func__);
 }
+
+} // end of extern "C"
 

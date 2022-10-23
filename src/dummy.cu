@@ -11,6 +11,8 @@ int main(){
     a_h = (int *)malloc(SIZE*sizeof(int));
 
     cudaMalloc(&a_d,SIZE*sizeof(int));
+    
+    printf("arg ptr:%p\n",a_d);
 
     dummy<<<1,SIZE>>>(a_d);
 
