@@ -1,33 +1,3 @@
-
-Fatbin elf code:
-================
-arch = sm_80
-code version = [1,7]
-host = linux
-compile_size = 64bit
-
-Fatbin elf code:
-================
-arch = sm_80
-code version = [1,7]
-host = linux
-compile_size = 64bit
-
-Fatbin ptx code:
-================
-arch = sm_80
-code version = [7,7]
-host = linux
-compile_size = 64bit
-compressed
-
-
-
-
-
-
-
-
 .version 7.7
 .target sm_80
 .address_size 64
