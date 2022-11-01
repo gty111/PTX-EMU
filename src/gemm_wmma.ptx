@@ -1,0 +1,168 @@
+
+Fatbin elf code:
+================
+arch = sm_80
+code version = [1,7]
+host = linux
+compile_size = 64bit
+
+Fatbin elf code:
+================
+arch = sm_80
+code version = [1,7]
+host = linux
+compile_size = 64bit
+
+Fatbin ptx code:
+================
+arch = sm_80
+code version = [7,7]
+host = linux
+compile_size = 64bit
+compressed
+
+
+
+
+
+
+
+
+.version 7.7
+.target sm_80
+.address_size 64
+
+
+
+.visible .entry _Z11wmma_kernelIddLi8ELi8ELi4ELi128ELi128ELi128EEvPT_S1_PT0_(
+.param .u64 _Z11wmma_kernelIddLi8ELi8ELi4ELi128ELi128ELi128EEvPT_S1_PT0__param_0,
+.param .u64 _Z11wmma_kernelIddLi8ELi8ELi4ELi128ELi128ELi128EEvPT_S1_PT0__param_1,
+.param .u64 _Z11wmma_kernelIddLi8ELi8ELi4ELi128ELi128ELi128EEvPT_S1_PT0__param_2
+)
+{
+.reg .b32 %r<11>;
+.reg .f64 %fd<130>;
+.reg .b64 %rd<10>;
+
+
+ld.param.u64 %rd1, [_Z11wmma_kernelIddLi8ELi8ELi4ELi128ELi128ELi128EEvPT_S1_PT0__param_0];
+ld.param.u64 %rd2, [_Z11wmma_kernelIddLi8ELi8ELi4ELi128ELi128ELi128EEvPT_S1_PT0__param_1];
+ld.param.u64 %rd3, [_Z11wmma_kernelIddLi8ELi8ELi4ELi128ELi128ELi128EEvPT_S1_PT0__param_2];
+mov.u32 %r1, %ctaid.x;
+mov.u32 %r2, %ntid.x;
+mov.u32 %r3, %tid.x;
+mad.lo.s32 %r4, %r1, %r2, %r3;
+shr.u32 %r5, %r4, 2;
+and.b32 %r6, %r5, 120;
+shl.b32 %r7, %r4, 1;
+and.b32 %r8, %r7, -1024;
+or.b32 %r9, %r6, %r8;
+mul.wide.s32 %rd4, %r8, 8;
+add.s64 %rd5, %rd1, %rd4;
+mul.wide.u32 %rd6, %r6, 8;
+add.s64 %rd7, %rd2, %rd6;
+mov.u32 %r10, 128;
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd1}, [%rd5], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd2}, [%rd7], %r10;
+mov.f64 %fd3, 0d0000000000000000;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd4, %fd5}, {%fd1}, {%fd2}, {%fd3, %fd3};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd6}, [%rd5+32], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd7}, [%rd7+4096], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd8, %fd9}, {%fd6}, {%fd7}, {%fd4, %fd5};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd10}, [%rd5+64], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd11}, [%rd7+8192], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd12, %fd13}, {%fd10}, {%fd11}, {%fd8, %fd9};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd14}, [%rd5+96], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd15}, [%rd7+12288], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd16, %fd17}, {%fd14}, {%fd15}, {%fd12, %fd13};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd18}, [%rd5+128], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd19}, [%rd7+16384], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd20, %fd21}, {%fd18}, {%fd19}, {%fd16, %fd17};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd22}, [%rd5+160], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd23}, [%rd7+20480], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd24, %fd25}, {%fd22}, {%fd23}, {%fd20, %fd21};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd26}, [%rd5+192], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd27}, [%rd7+24576], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd28, %fd29}, {%fd26}, {%fd27}, {%fd24, %fd25};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd30}, [%rd5+224], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd31}, [%rd7+28672], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd32, %fd33}, {%fd30}, {%fd31}, {%fd28, %fd29};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd34}, [%rd5+256], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd35}, [%rd7+32768], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd36, %fd37}, {%fd34}, {%fd35}, {%fd32, %fd33};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd38}, [%rd5+288], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd39}, [%rd7+36864], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd40, %fd41}, {%fd38}, {%fd39}, {%fd36, %fd37};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd42}, [%rd5+320], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd43}, [%rd7+40960], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd44, %fd45}, {%fd42}, {%fd43}, {%fd40, %fd41};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd46}, [%rd5+352], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd47}, [%rd7+45056], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd48, %fd49}, {%fd46}, {%fd47}, {%fd44, %fd45};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd50}, [%rd5+384], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd51}, [%rd7+49152], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd52, %fd53}, {%fd50}, {%fd51}, {%fd48, %fd49};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd54}, [%rd5+416], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd55}, [%rd7+53248], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd56, %fd57}, {%fd54}, {%fd55}, {%fd52, %fd53};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd58}, [%rd5+448], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd59}, [%rd7+57344], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd60, %fd61}, {%fd58}, {%fd59}, {%fd56, %fd57};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd62}, [%rd5+480], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd63}, [%rd7+61440], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd64, %fd65}, {%fd62}, {%fd63}, {%fd60, %fd61};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd66}, [%rd5+512], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd67}, [%rd7+65536], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd68, %fd69}, {%fd66}, {%fd67}, {%fd64, %fd65};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd70}, [%rd5+544], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd71}, [%rd7+69632], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd72, %fd73}, {%fd70}, {%fd71}, {%fd68, %fd69};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd74}, [%rd5+576], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd75}, [%rd7+73728], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd76, %fd77}, {%fd74}, {%fd75}, {%fd72, %fd73};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd78}, [%rd5+608], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd79}, [%rd7+77824], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd80, %fd81}, {%fd78}, {%fd79}, {%fd76, %fd77};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd82}, [%rd5+640], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd83}, [%rd7+81920], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd84, %fd85}, {%fd82}, {%fd83}, {%fd80, %fd81};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd86}, [%rd5+672], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd87}, [%rd7+86016], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd88, %fd89}, {%fd86}, {%fd87}, {%fd84, %fd85};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd90}, [%rd5+704], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd91}, [%rd7+90112], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd92, %fd93}, {%fd90}, {%fd91}, {%fd88, %fd89};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd94}, [%rd5+736], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd95}, [%rd7+94208], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd96, %fd97}, {%fd94}, {%fd95}, {%fd92, %fd93};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd98}, [%rd5+768], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd99}, [%rd7+98304], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd100, %fd101}, {%fd98}, {%fd99}, {%fd96, %fd97};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd102}, [%rd5+800], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd103}, [%rd7+102400], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd104, %fd105}, {%fd102}, {%fd103}, {%fd100, %fd101};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd106}, [%rd5+832], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd107}, [%rd7+106496], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd108, %fd109}, {%fd106}, {%fd107}, {%fd104, %fd105};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd110}, [%rd5+864], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd111}, [%rd7+110592], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd112, %fd113}, {%fd110}, {%fd111}, {%fd108, %fd109};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd114}, [%rd5+896], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd115}, [%rd7+114688], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd116, %fd117}, {%fd114}, {%fd115}, {%fd112, %fd113};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd118}, [%rd5+928], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd119}, [%rd7+118784], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd120, %fd121}, {%fd118}, {%fd119}, {%fd116, %fd117};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd122}, [%rd5+960], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd123}, [%rd7+122880], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd124, %fd125}, {%fd122}, {%fd123}, {%fd120, %fd121};
+wmma.load.a.sync.aligned.row.m8n8k4.f64 {%fd126}, [%rd5+992], %r10;
+wmma.load.b.sync.aligned.row.m8n8k4.f64 {%fd127}, [%rd7+126976], %r10;
+wmma.mma.sync.aligned.row.row.m8n8k4.f64.f64.f64.f64.rn {%fd128, %fd129}, {%fd126}, {%fd127}, {%fd124, %fd125};
+mul.wide.s32 %rd8, %r9, 8;
+add.s64 %rd9, %rd3, %rd8;
+wmma.store.d.sync.aligned.row.m8n8k4.f64 [%rd9], {%fd128, %fd129}, %r10;
+ret;
+
+}
+

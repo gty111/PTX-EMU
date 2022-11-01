@@ -1,0 +1,271 @@
+
+Fatbin elf code:
+================
+arch = sm_80
+code version = [1,7]
+host = linux
+compile_size = 64bit
+
+Fatbin elf code:
+================
+arch = sm_80
+code version = [1,7]
+host = linux
+compile_size = 64bit
+
+Fatbin ptx code:
+================
+arch = sm_80
+code version = [7,7]
+host = linux
+compile_size = 64bit
+compressed
+
+
+
+
+
+
+
+
+.version 7.7
+.target sm_80
+.address_size 64
+
+
+
+
+.visible .entry _Z11bmma_kernelI6__halffLi16ELi16ELi16ELi128ELi128ELi128EEvPT_S2_PT0_(
+.param .u64 _Z11bmma_kernelI6__halffLi16ELi16ELi16ELi128ELi128ELi128EEvPT_S2_PT0__param_0,
+.param .u64 _Z11bmma_kernelI6__halffLi16ELi16ELi16ELi128ELi128ELi128EEvPT_S2_PT0__param_1,
+.param .u64 _Z11bmma_kernelI6__halffLi16ELi16ELi16ELi128ELi128ELi128EEvPT_S2_PT0__param_2
+)
+{
+.reg .pred %p<11>;
+.reg .b16 %rs<3>;
+.reg .f32 %f<234>;
+.reg .b32 %r<177>;
+.reg .b64 %rd<61>;
+
+	.shared .align 4 .b8 _ZZ11bmma_kernelI6__halffLi16ELi16ELi16ELi128ELi128ELi128EEvPT_S2_PT0_E3shm[16384];
+
+ld.param.u64 %rd8, [_Z11bmma_kernelI6__halffLi16ELi16ELi16ELi128ELi128ELi128EEvPT_S2_PT0__param_0];
+ld.param.u64 %rd9, [_Z11bmma_kernelI6__halffLi16ELi16ELi16ELi128ELi128ELi128EEvPT_S2_PT0__param_1];
+cvta.to.global.u64 %rd1, %rd8;
+mov.u32 %r1, %ctaid.x;
+cvta.to.global.u64 %rd2, %rd9;
+mov.u32 %r2, %tid.x;
+shr.u32 %r176, %r2, 5;
+shl.b32 %r11, %r1, 4;
+and.b32 %r4, %r11, 112;
+shl.b32 %r12, %r1, 8;
+and.b32 %r13, %r12, -2048;
+cvt.s64.s32 %rd3, %r13;
+setp.ne.s32 %p1, %r176, 0;
+mov.f32 %f178, 0f00000000;
+mov.f32 %f179, %f178;
+mov.f32 %f180, %f178;
+mov.f32 %f181, %f178;
+mov.f32 %f182, %f178;
+mov.f32 %f183, %f178;
+mov.f32 %f184, %f178;
+mov.f32 %f185, %f178;
+@%p1 bra $L__BB0_2;
+
+shl.b64 %rd10, %rd3, 1;
+add.s64 %rd11, %rd1, %rd10;
+mul.wide.u32 %rd12, %r4, 2;
+add.s64 %rd13, %rd2, %rd12;
+mov.u32 %r14, 128;
+wmma.load.a.sync.aligned.row.m16n16k16.global.f16 {%r15, %r16, %r17, %r18, %r19, %r20, %r21, %r22}, [%rd11], %r14;
+wmma.load.b.sync.aligned.row.m16n16k16.global.f16 {%r23, %r24, %r25, %r26, %r27, %r28, %r29, %r30}, [%rd13], %r14;
+mov.f32 %f137, 0f00000000;
+wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32 {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178}, {%r15, %r16, %r17, %r18, %r19, %r20, %r21, %r22}, {%r23, %r24, %r25, %r26, %r27, %r28, %r29, %r30}, {%f137, %f137, %f137, %f137, %f137, %f137, %f137, %f137};
+
+$L__BB0_2:
+setp.ne.s32 %p2, %r176, 1;
+@%p2 bra $L__BB0_4;
+
+shl.b64 %rd14, %rd3, 1;
+add.s64 %rd15, %rd1, %rd14;
+add.s64 %rd16, %rd15, 32;
+or.b32 %r31, %r4, 2048;
+mul.wide.u32 %rd17, %r31, 2;
+add.s64 %rd18, %rd2, %rd17;
+mov.u32 %r32, 128;
+wmma.load.a.sync.aligned.row.m16n16k16.global.f16 {%r33, %r34, %r35, %r36, %r37, %r38, %r39, %r40}, [%rd16], %r32;
+wmma.load.b.sync.aligned.row.m16n16k16.global.f16 {%r41, %r42, %r43, %r44, %r45, %r46, %r47, %r48}, [%rd18], %r32;
+wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32 {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178}, {%r33, %r34, %r35, %r36, %r37, %r38, %r39, %r40}, {%r41, %r42, %r43, %r44, %r45, %r46, %r47, %r48}, {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178};
+
+$L__BB0_4:
+setp.ne.s32 %p3, %r176, 2;
+@%p3 bra $L__BB0_6;
+
+shl.b64 %rd19, %rd3, 1;
+add.s64 %rd20, %rd1, %rd19;
+add.s64 %rd21, %rd20, 64;
+or.b32 %r49, %r4, 4096;
+mul.wide.u32 %rd22, %r49, 2;
+add.s64 %rd23, %rd2, %rd22;
+mov.u32 %r50, 128;
+wmma.load.a.sync.aligned.row.m16n16k16.global.f16 {%r51, %r52, %r53, %r54, %r55, %r56, %r57, %r58}, [%rd21], %r50;
+wmma.load.b.sync.aligned.row.m16n16k16.global.f16 {%r59, %r60, %r61, %r62, %r63, %r64, %r65, %r66}, [%rd23], %r50;
+wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32 {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178}, {%r51, %r52, %r53, %r54, %r55, %r56, %r57, %r58}, {%r59, %r60, %r61, %r62, %r63, %r64, %r65, %r66}, {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178};
+
+$L__BB0_6:
+setp.ne.s32 %p4, %r176, 3;
+@%p4 bra $L__BB0_8;
+
+shl.b64 %rd24, %rd3, 1;
+add.s64 %rd25, %rd1, %rd24;
+add.s64 %rd26, %rd25, 96;
+or.b32 %r67, %r4, 6144;
+mul.wide.u32 %rd27, %r67, 2;
+add.s64 %rd28, %rd2, %rd27;
+mov.u32 %r68, 128;
+wmma.load.a.sync.aligned.row.m16n16k16.global.f16 {%r69, %r70, %r71, %r72, %r73, %r74, %r75, %r76}, [%rd26], %r68;
+wmma.load.b.sync.aligned.row.m16n16k16.global.f16 {%r77, %r78, %r79, %r80, %r81, %r82, %r83, %r84}, [%rd28], %r68;
+wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32 {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178}, {%r69, %r70, %r71, %r72, %r73, %r74, %r75, %r76}, {%r77, %r78, %r79, %r80, %r81, %r82, %r83, %r84}, {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178};
+
+$L__BB0_8:
+setp.ne.s32 %p5, %r176, 4;
+@%p5 bra $L__BB0_10;
+
+shl.b64 %rd29, %rd3, 1;
+add.s64 %rd30, %rd1, %rd29;
+add.s64 %rd31, %rd30, 128;
+or.b32 %r85, %r4, 8192;
+mul.wide.u32 %rd32, %r85, 2;
+add.s64 %rd33, %rd2, %rd32;
+mov.u32 %r86, 128;
+wmma.load.a.sync.aligned.row.m16n16k16.global.f16 {%r87, %r88, %r89, %r90, %r91, %r92, %r93, %r94}, [%rd31], %r86;
+wmma.load.b.sync.aligned.row.m16n16k16.global.f16 {%r95, %r96, %r97, %r98, %r99, %r100, %r101, %r102}, [%rd33], %r86;
+wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32 {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178}, {%r87, %r88, %r89, %r90, %r91, %r92, %r93, %r94}, {%r95, %r96, %r97, %r98, %r99, %r100, %r101, %r102}, {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178};
+
+$L__BB0_10:
+setp.ne.s32 %p6, %r176, 5;
+@%p6 bra $L__BB0_12;
+
+shl.b64 %rd34, %rd3, 1;
+add.s64 %rd35, %rd1, %rd34;
+add.s64 %rd36, %rd35, 160;
+or.b32 %r103, %r4, 10240;
+mul.wide.u32 %rd37, %r103, 2;
+add.s64 %rd38, %rd2, %rd37;
+mov.u32 %r104, 128;
+wmma.load.a.sync.aligned.row.m16n16k16.global.f16 {%r105, %r106, %r107, %r108, %r109, %r110, %r111, %r112}, [%rd36], %r104;
+wmma.load.b.sync.aligned.row.m16n16k16.global.f16 {%r113, %r114, %r115, %r116, %r117, %r118, %r119, %r120}, [%rd38], %r104;
+wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32 {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178}, {%r105, %r106, %r107, %r108, %r109, %r110, %r111, %r112}, {%r113, %r114, %r115, %r116, %r117, %r118, %r119, %r120}, {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178};
+
+$L__BB0_12:
+setp.ne.s32 %p7, %r176, 6;
+@%p7 bra $L__BB0_14;
+
+shl.b64 %rd39, %rd3, 1;
+add.s64 %rd40, %rd1, %rd39;
+add.s64 %rd41, %rd40, 192;
+or.b32 %r121, %r4, 12288;
+mul.wide.u32 %rd42, %r121, 2;
+add.s64 %rd43, %rd2, %rd42;
+mov.u32 %r122, 128;
+wmma.load.a.sync.aligned.row.m16n16k16.global.f16 {%r123, %r124, %r125, %r126, %r127, %r128, %r129, %r130}, [%rd41], %r122;
+wmma.load.b.sync.aligned.row.m16n16k16.global.f16 {%r131, %r132, %r133, %r134, %r135, %r136, %r137, %r138}, [%rd43], %r122;
+wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32 {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178}, {%r123, %r124, %r125, %r126, %r127, %r128, %r129, %r130}, {%r131, %r132, %r133, %r134, %r135, %r136, %r137, %r138}, {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178};
+
+$L__BB0_14:
+setp.ne.s32 %p8, %r176, 7;
+@%p8 bra $L__BB0_16;
+
+shl.b64 %rd44, %rd3, 1;
+add.s64 %rd45, %rd1, %rd44;
+add.s64 %rd46, %rd45, 224;
+or.b32 %r139, %r4, 14336;
+mul.wide.u32 %rd47, %r139, 2;
+add.s64 %rd48, %rd2, %rd47;
+mov.u32 %r140, 128;
+wmma.load.a.sync.aligned.row.m16n16k16.global.f16 {%r141, %r142, %r143, %r144, %r145, %r146, %r147, %r148}, [%rd46], %r140;
+wmma.load.b.sync.aligned.row.m16n16k16.global.f16 {%r149, %r150, %r151, %r152, %r153, %r154, %r155, %r156}, [%rd48], %r140;
+wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32 {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178}, {%r141, %r142, %r143, %r144, %r145, %r146, %r147, %r148}, {%r149, %r150, %r151, %r152, %r153, %r154, %r155, %r156}, {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178};
+
+$L__BB0_16:
+mov.u32 %r173, %tid.x;
+mov.u32 %r172, %ctaid.x;
+shl.b32 %r171, %r172, 8;
+and.b32 %r170, %r171, -2048;
+or.b32 %r5, %r4, %r170;
+shl.b32 %r159, %r176, 6;
+mov.u32 %r160, _ZZ11bmma_kernelI6__halffLi16ELi16ELi16ELi128ELi128ELi128EEvPT_S2_PT0_E3shm;
+add.s32 %r161, %r160, %r159;
+mov.u32 %r162, 256;
+wmma.store.d.sync.aligned.row.m16n16k16.shared.f32 [%r161], {%f185, %f184, %f183, %f182, %f181, %f180, %f179, %f178}, %r162;
+bar.sync 0;
+setp.gt.u32 %p9, %r173, 8191;
+@%p9 bra $L__BB0_19;
+
+ld.param.u64 %rd59, [_Z11bmma_kernelI6__halffLi16ELi16ELi16ELi128ELi128ELi128EEvPT_S2_PT0__param_2];
+mov.u32 %r174, %tid.x;
+shr.u32 %r163, %r174, 2;
+cvt.u64.u32 %rd50, %r163;
+and.b64 %rd51, %rd50, 1073741696;
+cvt.s64.s32 %rd52, %r5;
+add.s64 %rd53, %rd51, %rd52;
+cvt.u64.u32 %rd54, %r176;
+and.b64 %rd55, %rd54, 15;
+add.s64 %rd56, %rd53, %rd55;
+cvta.to.global.u64 %rd57, %rd59;
+shl.b64 %rd58, %rd56, 2;
+add.s64 %rd60, %rd57, %rd58;
+shl.b32 %r164, %r174, 1;
+and.b32 %r165, %r164, -1024;
+add.s32 %r167, %r160, %r165;
+cvt.u16.u32 %rs1, %r176;
+and.b16 %rs2, %rs1, 15;
+mul.wide.u16 %r168, %rs2, 4;
+add.s32 %r169, %r167, %r168;
+add.s32 %r175, %r169, 512;
+
+$L__BB0_18:
+ld.shared.f32 %f138, [%r175+-512];
+add.f32 %f139, %f138, 0f00000000;
+ld.shared.f32 %f140, [%r175+-448];
+add.f32 %f141, %f140, %f139;
+ld.shared.f32 %f142, [%r175+-384];
+add.f32 %f143, %f142, %f141;
+ld.shared.f32 %f144, [%r175+-320];
+add.f32 %f145, %f144, %f143;
+ld.shared.f32 %f146, [%r175+-256];
+add.f32 %f147, %f146, %f145;
+ld.shared.f32 %f148, [%r175+-192];
+add.f32 %f149, %f148, %f147;
+ld.shared.f32 %f150, [%r175+-128];
+add.f32 %f151, %f150, %f149;
+ld.shared.f32 %f152, [%r175+-64];
+add.f32 %f153, %f152, %f151;
+ld.shared.f32 %f154, [%r175];
+add.f32 %f155, %f154, %f153;
+ld.shared.f32 %f156, [%r175+64];
+add.f32 %f157, %f156, %f155;
+ld.shared.f32 %f158, [%r175+128];
+add.f32 %f159, %f158, %f157;
+ld.shared.f32 %f160, [%r175+192];
+add.f32 %f161, %f160, %f159;
+ld.shared.f32 %f162, [%r175+256];
+add.f32 %f163, %f162, %f161;
+ld.shared.f32 %f164, [%r175+320];
+add.f32 %f165, %f164, %f163;
+ld.shared.f32 %f166, [%r175+384];
+add.f32 %f167, %f166, %f165;
+ld.shared.f32 %f168, [%r175+448];
+add.f32 %f169, %f168, %f167;
+st.global.f32 [%rd60], %f169;
+add.s64 %rd60, %rd60, 512;
+add.s32 %r175, %r175, 1024;
+add.s32 %r176, %r176, 16;
+setp.lt.u32 %p10, %r176, 256;
+@%p10 bra $L__BB0_18;
+
+$L__BB0_19:
+ret;
+
+}
+
