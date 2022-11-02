@@ -26,8 +26,11 @@ qualifier : U64
           | B16
           | B32
           | B64
+          | F8
+          | F16
           | F32
           | F64
+          | S8
           | S16
           | S32
           | S64
@@ -47,6 +50,13 @@ qualifier : U64
           | LO
           | UNI 
           | RN
+          | A
+          | B
+          | D
+          | ROW
+          | ALIGNED
+          | M8N8K4
+          | M16N16K16
           ;
         
 param : qualifier* ID COMMA param
@@ -76,9 +86,16 @@ statement : REG qualifier reg (LESS DIGITS GREATER)? SEMI
           | (MUL|DIV|SUB|ADD|SHL|SHR|MAX|MIN|AND|OR) qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI 
           | ST qualifier* fetchAddress COMMA (reg|vector) SEMI
           | (SELP|MAD|FMA) qualifier* reg COMMA (reg|DIGITS) COMMA (reg|DIGITS) COMMA reg SEMI
+          | WMMA LOAD qualifier* vector COMMA fetchAddress COMMA reg SEMI 
+          | WMMA STORE qualifier* fetchAddress COMMA vector COMMA reg SEMI 
+          | WMMA MMA qualifier* vector COMMA vector COMMA vector COMMA vector SEMI 
           ;
 
 reg : PERCENT (ID | ID DOT ID) ;
-vector : LeftBrace reg COMMA reg COMMA reg COMMA reg RightBrace ;
+vector : LeftBrace reg RightBrace 
+       | LeftBrace reg COMMA reg RightBrace
+       | LeftBrace reg COMMA reg COMMA reg COMMA reg RightBrace 
+       | LeftBrace reg COMMA reg COMMA reg COMMA reg COMMA reg COMMA reg COMMA reg COMMA reg RightBrace
+       ;
 
 fetchAddress : LeftBracket (ID|reg|reg PLUS MINUS? DIGITS) RightBracket ;

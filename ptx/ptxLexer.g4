@@ -50,6 +50,26 @@ UNI: '.uni' ;
 
 NE: '.ne' ;
 
+STORE: '.store' ;
+
+LOAD: '.load' ;
+
+A: '.a' ;
+
+B: '.b' ;
+
+D: '.d' ;
+
+MMA: '.mma' ;
+
+ROW: '.row' ;
+
+ALIGNED: '.aligned' ;
+
+M8N8K4: '.m8n8k4' ;
+
+M16N16K16: '.m16n16k16' ;
+
 /* ************ */
 
 PRAGMA: '.pragma' ;
@@ -99,6 +119,8 @@ OR: 'or' ;
 MIN: 'min' ;
 
 RCP: 'rcp' ;
+
+WMMA: 'wmma' ;
 
 /* ************ */
 DOUBLEQUOTES: '"' ;
@@ -159,9 +181,15 @@ B32: '.b32' ;
 
 B64: '.b64' ;
 
+F8: '.f8' ;
+
+F16: '.f16' ;
+
 F32: '.f32' ;
 
 F64: '.f64' ;
+
+S8: '.s8' ;
 
 S16: '.s16' ;
 
