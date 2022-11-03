@@ -14,7 +14,7 @@ kernels : kernel kernels
         | kernel 
         ;
 
-kernel : VISIBLE? ENTRY ID LeftParen param? RightParen (MAXNTID DIGITS COMMA DIGITS COMMA DIGITS)? compoundStatement 
+kernel : VISIBLE? ENTRY? ID LeftParen params? RightParen (MAXNTID DIGITS COMMA DIGITS COMMA DIGITS)? compoundStatement 
        ;
 
 qualifier : U64
@@ -58,10 +58,12 @@ qualifier : U64
           | M8N8K4
           | M16N16K16
           ;
-        
-param : qualifier* ID COMMA param
-      | qualifier* ID 
-      ;   
+
+params : param COMMA params
+       | param 
+       ;
+
+param : PARAM qualifier ID ;
 
 compoundStatement : LeftBrace statements? RightBrace ;
 
@@ -76,11 +78,11 @@ statement : REG qualifier reg (LESS DIGITS GREATER)? SEMI
           | AT reg BRA DOLLOR ID SEMI 
           | PRAGMA STRING SEMI
           | RET SEMI
-          | BAR qualifier* DIGITS SEMI
-          | BRA qualifier* DOLLOR ID SEMI
-          | RCP qualifier* reg COMMA reg SEMI
+          | BAR qualifier+ DIGITS SEMI
+          | BRA qualifier? DOLLOR ID SEMI
+          | RCP qualifier+ reg COMMA reg SEMI
           | LD qualifier* reg COMMA fetchAddress SEMI
-          | MOV qualifier* reg COMMA (reg|ID|DIGITS) SEMI 
+          | MOV qualifier reg COMMA (reg|ID|DIGITS) SEMI 
           | SETP qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI
           | (CVTA|CVT) qualifier* reg COMMA reg SEMI
           | (MUL|DIV|SUB|ADD|SHL|SHR|MAX|MIN|AND|OR) qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI 
