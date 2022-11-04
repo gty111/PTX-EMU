@@ -93,37 +93,78 @@ enum OpType{
   O_REG,
   O_VAR,
   O_IMM,
-  O_VEC
+  O_VEC,
+  O_FA
+};
+
+enum WmmaType {
+  WMMA_LOAD,
+  WMMA_STORE,
+  WMMA_MMA
 };
 
 class OperandContext {
   public:
     OpType opType;
-    void *operandContext;
+    void *operand;
     class REG {
       public:
         std::string regMajorName;
         std::string regMinorName;
         int regIdx;
+
+        REG(){}
+
+        REG(const REG &reg){
+          this->regIdx = reg.regIdx;
+          this->regMajorName = reg.regMajorName;
+          this->regMinorName = reg.regMinorName;
+        }
     };
     class VAR {
       public:
         std::string varName;
+
+        VAR(){}
+
+        VAR(std::string s){
+          varName = s;
+        }
     };
     class IMM {
       public:
         std::string immVal;
+        
+        IMM(){}
+
+        IMM(std::string s){
+          immVal = s;
+        }
     };
     class VEC {
       public:
         std::vector<OperandContext> vec;
-    };
-};
+      
+      VEC(){}
 
-class FetchAddressContext{
-  public:
-    std::string base;
-    uint64_t offset;
+      VEC(const VEC &v){
+        this->vec = v.vec;
+      }
+    };
+    class FA{ //fetch address
+      public:
+        std::string base;
+        std::string offset;
+        bool ifMinus;
+
+        FA(){}
+
+        FA(const FA &fa){
+          this->base = fa.base;
+          this->offset  = fa.offset;
+          this->ifMinus = fa.ifMinus;
+        }
+    };
 };
 
 class StatementContext{
@@ -156,7 +197,7 @@ class StatementContext{
     };
     class AT {
       public:
-        OperandContext op;
+        OperandContext atOp;
         std::string atLabelName;
     };
     class PRAGMA {
@@ -183,8 +224,7 @@ class StatementContext{
     class LD {
       public:
         std::vector<Qualifier> ldQualifier;
-        OperandContext ldOp;
-        FetchAddressContext *fetchAddress;
+        OperandContext ldOp[2];
     };
     class MOV {
       public:
@@ -259,8 +299,7 @@ class StatementContext{
     class ST{
       public:
         std::vector<Qualifier> stQualifier;
-        OperandContext stOp;
-        FetchAddressContext *fetchAddress;
+        OperandContext stOp[2];
     };
     class SELP{
       public:
@@ -279,8 +318,9 @@ class StatementContext{
     };
     class WMMA{
       public:
+        WmmaType wmmaType;
         std::vector<Qualifier> wmmaQualifier;
-        std::vector<OperandContext> wmmaOp; 
+        OperandContext wmmaOp[4]; 
     };
 };
 
@@ -319,27 +359,32 @@ class PtxListener : public ptxParserBaseListener{
     StatementType statementType;
     StatementContext statementContext;
     void *statement;
-    std::queue<std::string> regMajorName,regMinorName;
+    std::queue<OperandContext*> op;
 
     /* helper function */
 
-    int extractIdx(std::string s){
+    void extractREG(std::string s,int &idx,std::string &name){
       int ret = 0;
       for(char c:s){
         if(c>='0'&&c<='9'){
           ret = ret*10 + c - '0';
         }
       }
-      return ret;
-    }
-
-    std::string extractName(std::string s){
+      idx = ret;
       for(int i=0;i<s.size();i++){
-        if(s[i]>='0'&&s[i]<='9'){
-          return s.substr(0,i);
+        if((s[i]>='0'&&s[i]<='9')){
+          name = s.substr(0,i);
+          return;
         }
       }
-      return s;
+      name = s;
+    }
+
+    void fetchOperand(OperandContext &oc){
+      assert(op.size());
+      oc.operand = op.front()->operand;
+      oc.opType = op.front()->opType;
+      op.pop();
     }
 
     /* listener function */
@@ -349,7 +394,7 @@ class PtxListener : public ptxParserBaseListener{
     }
 
     void exitAst(ptxParser::AstContext *ctx) override {
-      std::cout << "exit ast" << std::endl;
+      std::cout << "exit ast kernel num:" << ptxContext.ptxKernels.size() << std::endl;
     }
     void enterVersionDes(ptxParser::VersionDesContext *ctx) override { 
       std::cout << "enter versiondes" << std::endl;
@@ -556,6 +601,7 @@ class PtxListener : public ptxParserBaseListener{
       std::cout << "enter statement" << std::endl;
     }
     void exitStatement(ptxParser::StatementContext *ctx) override { 
+      assert(op.size()==0);
       statementContext.statementType = statementType;
       statementContext.statement = statement;
       kernelContext->kernelStatements.push_back(statementContext);
@@ -573,10 +619,12 @@ class PtxListener : public ptxParserBaseListener{
       qualifier.pop();
 
       /* reg */
-      st->regMajorName = regMajorName.front();
-      regMajorName.pop();
-      st->regMinorName = regMinorName.front();
-      regMinorName.pop();
+      assert(op.size());
+      assert(op.front()->opType==O_REG);
+      auto reg = *(OperandContext::REG*)op.front()->operand;
+      st->regMajorName = reg.regMajorName;
+      st->regMinorName = reg.regMinorName;
+      op.pop();
 
       /* digits */
       if(ctx->DIGITS()){
@@ -665,23 +713,14 @@ class PtxListener : public ptxParserBaseListener{
       auto st = (StatementContext::AT *)statement;
 
       /* reg */
-      st->op = *new OperandContext();
-      st->op.opType = O_REG;
-      st->op.operandContext = new OperandContext::REG();
-      auto op = (OperandContext::REG*)st->op.operandContext;
-      op->regIdx = extractIdx(regMajorName.front());
-      op->regMajorName = extractName(regMajorName.front());
-      regMajorName.pop();
-      op->regMinorName = regMinorName.front();
-      regMinorName.pop();
+      fetchOperand(st->atOp);
 
       /* ID */
       st->atLabelName = ctx->ID()->getText();
 
       /* end */
       statementType = S_AT;
-      std::cout << "exit atStatement " << op->regMajorName << ' ' << op->regIdx << 
-        ' ' << op->regMinorName << ' ' << st->atLabelName << std::endl;
+      std::cout << "exit atStatement" << std::endl;
     }
 
     void enterPragmaStatement(ptxParser::PragmaStatementContext *ctx) override { 
@@ -759,6 +798,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitRcpStatement(ptxParser::RcpStatementContext *ctx) override { 
       auto st = (StatementContext::RCP *)statement;
+      
+      /* qualifier */
+      while(qualifier.size()){
+        st->rcpQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->rcpOp[i]);
+      }
+
       /* end */
       statementType = S_RCP;
       std::cout << "exit rcpStatement" << std::endl;
@@ -770,6 +821,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitLdStatement(ptxParser::LdStatementContext *ctx) override {
       auto st = (StatementContext::LD *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->ldQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->ldOp[i]);
+      }
+
       /* end */
       statementType = S_LD; 
       std::cout << "exit ldStatement" << std::endl;
@@ -781,6 +844,16 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitMovStatement(ptxParser::MovStatementContext *ctx) override { 
       auto st = (StatementContext::MOV *)statement;
+
+      /* qualifier */
+      st->movQualifier = qualifier.front();
+      qualifier.pop();
+
+      /* op0,1 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->movOp[i]);
+      }
+
       /* end */
       statementType = S_MOV;
       std::cout << "exit movStatement" << std::endl;
@@ -792,6 +865,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitSetpStatement(ptxParser::SetpStatementContext *ctx) override { 
       auto st = (StatementContext::SETP *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->setpQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->setpOp[i]);
+      }
+
       /* end */
       statementType = S_SETP;
       std::cout << "exit setpStatement" << std::endl;
@@ -803,6 +888,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitCvtaStatement(ptxParser::CvtaStatementContext *ctx) override {
       auto st = (StatementContext::CVTA *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->cvtaQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->cvtaOp[i]);
+      }
+
       /* end */
       statementType = S_CVTA;
       std::cout << "exit cvtaStatement" << std::endl;
@@ -814,6 +911,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitCvtStatement(ptxParser::CvtStatementContext *ctx) override { 
       auto st = (StatementContext::CVT *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->cvtQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->cvtOp[i]);
+      }
+
       /* end */
       statementType = S_CVT;
       std::cout << "exit cvtStatement" << std::endl;
@@ -825,6 +934,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitMulStatement(ptxParser::MulStatementContext *ctx) override { 
       auto st = (StatementContext::MUL *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->mulQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->mulOp[i]);
+      }
+
       /* end */
       statementType = S_MUL;
       std::cout << "exit mulStatement" << std::endl;
@@ -836,6 +957,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitDivStatement(ptxParser::DivStatementContext *ctx) override { 
       auto st = (StatementContext::DIV *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->divQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->divOp[i]);
+      }
+
       /* end */
       statementType = S_DIV;
       std::cout << "exit divStatement" << std::endl;
@@ -847,6 +980,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitSubStatement(ptxParser::SubStatementContext *ctx) override { 
       auto st = (StatementContext::SUB *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->subQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->subOp[i]);
+      }
+
       /* end */
       statementType = S_SUB;
       std::cout << "exit subStatement" << std::endl;
@@ -858,6 +1003,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitAddStatement(ptxParser::AddStatementContext *ctx) override { 
       auto st = (StatementContext::ADD *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->addQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->addOp[i]);
+      }
+
       /* end */
       statementType = S_ADD;
       std::cout << "exit addStatement" << std::endl;
@@ -869,6 +1026,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitShlStatement(ptxParser::ShlStatementContext *ctx) override { 
       auto st = (StatementContext::SHL *)statement;
+      
+      /* qualifier */
+      while(qualifier.size()){
+        st->shlQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->shlOp[i]);
+      }
+
       /* end */
       statementType = S_SHL;
       std::cout << "exit shlStatement" << std::endl;
@@ -880,6 +1049,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitShrStatement(ptxParser::ShrStatementContext *ctx) override { 
       auto st = (StatementContext::SHR *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->shrQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->shrOp[i]);
+      }
+
       /* end */
       statementType = S_SHR;
       std::cout << "exit shrStatement" << std::endl;
@@ -891,6 +1072,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitMaxStatement(ptxParser::MaxStatementContext *ctx) override { 
       auto st = (StatementContext::MAX *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->maxQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->maxOp[i]);
+      }
+
       /* end */
       statementType = S_MAX;
       std::cout << "exit maxStatement" << std::endl;
@@ -902,6 +1095,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitMinStatement(ptxParser::MinStatementContext *ctx) override { 
       auto st = (StatementContext::MIN *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->minQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->minOp[i]);
+      }
+
       /* end */
       statementType = S_MIN;
       std::cout << "exit minStatement" << std::endl;
@@ -913,6 +1118,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitAndStatement(ptxParser::AndStatementContext *ctx) override { 
       auto st = (StatementContext::AND *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->andQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->andOp[i]);
+      }
+
       /* end */
       statementType = S_AND;
       std::cout << "exit andStatement" << std::endl;
@@ -924,6 +1141,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitOrStatement(ptxParser::OrStatementContext *ctx) override { 
       auto st = (StatementContext::OR *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->orQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->orOp[i]);
+      }
+
       /* end */
       statementType = S_OR;
       std::cout << "exit orStatement" << std::endl;
@@ -935,6 +1164,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitStStatement(ptxParser::StStatementContext *ctx) override { 
       auto st = (StatementContext::ST *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->stQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->stOp[i]);
+      }
+
       /* end */
       statementType = S_ST;
       std::cout << "exit stStatement" << std::endl;
@@ -946,6 +1187,16 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitSelpStatement(ptxParser::SelpStatementContext *ctx) override { 
       auto st = (StatementContext::SELP *)statement;
+      
+      /* qualifier */
+      st->selpQualifier = qualifier.front();
+      qualifier.pop();
+      
+      /* op0,1,2,3 */
+      for(int i=0;i<4;i++){
+        fetchOperand(st->selpOp[i]);
+      }
+      
       /* end */
       statementType = S_SELP;
       std::cout << "exit selpStatement" << std::endl;
@@ -957,6 +1208,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitMadStatement(ptxParser::MadStatementContext *ctx) override { 
       auto st = (StatementContext::MAD *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->madQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2,3 */
+      for(int i=0;i<4;i++){
+        fetchOperand(st->madOp[i]);
+      }
+
       /* end */
       statementType = S_MAD;
       std::cout << "exit madStatement" << std::endl;
@@ -968,6 +1231,18 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitFmaStatement(ptxParser::FmaStatementContext *ctx) override {
       auto st = (StatementContext::FMA *)statement; 
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->fmaQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op0,1,2,3 */
+      for(int i=0;i<4;i++){
+        fetchOperand(st->fmaOp[i]);
+      }
+
       /* end */
       statementType = S_FMA;
       std::cout << "exit fmaStatement" << std::endl;
@@ -979,6 +1254,31 @@ class PtxListener : public ptxParserBaseListener{
     }
     void exitWmmaStatement(ptxParser::WmmaStatementContext *ctx) override {
       auto st = (StatementContext::WMMA *)statement;
+
+      /* wmmatype & op */
+      if(ctx->LOAD()){
+        st->wmmaType = WMMA_LOAD;
+        for(int i=0;i<3;i++){
+          fetchOperand(st->wmmaOp[i]);
+        }
+      }else if(ctx->STORE()){
+        st->wmmaType = WMMA_STORE;
+        for(int i=0;i<3;i++){
+          fetchOperand(st->wmmaOp[i]);
+        }
+      }else if(ctx->WMMA()){
+        st->wmmaType = WMMA_MMA;
+        for(int i=0;i<4;i++){
+          fetchOperand(st->wmmaOp[i]);
+        }
+      }
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->wmmaQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
       /* end */
       statementType = S_WMMA; 
       std::cout << "exit wmmaStatement" << std::endl;
@@ -988,19 +1288,36 @@ class PtxListener : public ptxParserBaseListener{
       std::cout << "enter reg" << std::endl;
     }
     void exitReg(ptxParser::RegContext *ctx) override { 
-      regMajorName.push(ctx->ID(0)->getText());
-      if(ctx->ID().size()==2){
-        regMinorName.push(ctx->ID(1)->getText());
-      }else {
-        regMinorName.push("");
-      }
-      std::cout << "exit reg " << regMajorName.back() << regMinorName.back() << std::endl;
+      OperandContext *o = new OperandContext();
+      OperandContext::REG *r = new OperandContext::REG();
+      extractREG(ctx->ID(0)->getText(),r->regIdx,r->regMajorName);
+      r->regMinorName = ctx->ID(1) ? ctx->ID(1)->getText() : "";
+      o->operand = r;
+      o->opType = O_REG;
+      op.push(o); 
+      std::cout << "exit reg " << r->regMajorName << r->regIdx << ' '
+                << r->regMinorName << std::endl;
     }
 
     void enterVector(ptxParser::VectorContext *ctx) override { 
       std::cout << "enter vector" << std::endl;
     }
     void exitVector(ptxParser::VectorContext *ctx) override { 
+      OperandContext *o = new OperandContext();
+      OperandContext::VEC *v = new OperandContext::VEC();
+
+      for(int i=0;i<ctx->regi().size();i++){
+        OperandContext oc;
+        oc.opType = O_REG;
+        oc.operand = new OperandContext::REG();
+        auto r = (OperandContext::REG*)oc.operand;
+        extractREG(ctx->regi(i)->ID(0)->getText(),r->regIdx,r->regMajorName);
+        r->regMinorName = ctx->regi(i)->ID(1) ? ctx->regi(i)->ID(1)->getText() : "";
+        v->vec.push_back(oc);
+      }
+      o->operand = v;
+      o->opType = O_VEC;
+      op.push(o);
       std::cout << "exit vector" << std::endl;
     }
 
@@ -1008,7 +1325,61 @@ class PtxListener : public ptxParserBaseListener{
       std::cout << "enter fectchaddress" << std::endl;
     }
     void exitFetchAddress(ptxParser::FetchAddressContext *ctx) override { 
-      std::cout << "exit fetchaddress" << std::endl;
+      OperandContext *o = new OperandContext();
+      OperandContext::FA *fa = new OperandContext::FA();
+
+      /* base */
+      if(ctx->ID()){
+        fa->base = ctx->ID()->getText();
+      }else if(ctx->regi()){
+        // assume base not require regMinorName
+        fa->base = ctx->regi()->ID(0)->getText();
+      }else assert(0);
+
+      /* minus */
+      fa->ifMinus = ctx->MINUS() ? true : false;
+
+      /* offset */
+      if(ctx->DIGITS()){
+        fa->offset = ctx->DIGITS()->getText();
+      }else{
+        fa->offset = "0";
+      }
+      
+      /* end */
+      o->operand = fa;
+      o->opType = O_FA;
+      op.push(o);
+      std::cout << "exit fetchaddress " << fa->base << ' ' 
+                << fa->ifMinus << ' ' << fa->offset << std::endl;
+    }
+
+    void enterImm(ptxParser::ImmContext *ctx) override { 
+      std::cout << "enter imm" << std::endl;
+    }
+    void exitImm(ptxParser::ImmContext *ctx) override { 
+      OperandContext *o = new OperandContext();
+      OperandContext::IMM *imm = new OperandContext::IMM();
+
+      imm->immVal = ctx->DIGITS()->getText();
+      o->operand = imm;
+      o->opType = O_IMM;
+      op.push(o);
+      std::cout << "exit imm" << std::endl;
+    }
+
+    void enterVar(ptxParser::VarContext *ctx) override { 
+      std::cout << "enter var" << std::endl;
+    }
+    void exitVar(ptxParser::VarContext *ctx) override { 
+      OperandContext *o = new OperandContext();
+      OperandContext::VAR *var = new OperandContext::VAR();
+
+      var->varName = ctx->ID()->getText();
+      o->operand = var;
+      o->opType = O_VAR;
+      op.push(o);
+      std::cout << "exit var" << std::endl;
     }
 };
 
