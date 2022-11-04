@@ -14,8 +14,10 @@ kernels : kernel kernels
         | kernel 
         ;
 
-kernel : VISIBLE? ENTRY? ID LeftParen params? RightParen (MAXNTID DIGITS COMMA DIGITS COMMA DIGITS)? compoundStatement 
+kernel : VISIBLE? ENTRY? ID LeftParen params? RightParen performanceTuning? compoundStatement 
        ;
+
+performanceTuning : MAXNTID DIGITS COMMA DIGITS COMMA DIGITS ;
 
 qualifier : U64
           | U32
@@ -71,27 +73,71 @@ statements : statement statements
            | statement
            ; 
 
-statement : REG qualifier reg (LESS DIGITS GREATER)? SEMI
-          | SHARED ALIGN DIGITS qualifier ID LeftBracket DIGITS RightBracket SEMI
-          | LOCAL ALIGN DIGITS qualifier ID LeftBracket DIGITS RightBracket SEMI
-          | DOLLOR ID COLON
-          | AT reg BRA DOLLOR ID SEMI 
-          | PRAGMA STRING SEMI
-          | RET SEMI
-          | BAR qualifier+ DIGITS SEMI
-          | BRA qualifier? DOLLOR ID SEMI
-          | RCP qualifier+ reg COMMA reg SEMI
-          | LD qualifier* reg COMMA fetchAddress SEMI
-          | MOV qualifier reg COMMA (reg|ID|DIGITS) SEMI 
-          | SETP qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI
-          | (CVTA|CVT) qualifier* reg COMMA reg SEMI
-          | (MUL|DIV|SUB|ADD|SHL|SHR|MAX|MIN|AND|OR) qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI 
-          | ST qualifier* fetchAddress COMMA (reg|vector) SEMI
-          | (SELP|MAD|FMA) qualifier* reg COMMA (reg|DIGITS) COMMA (reg|DIGITS) COMMA reg SEMI
-          | WMMA LOAD qualifier* vector COMMA fetchAddress COMMA reg SEMI 
-          | WMMA STORE qualifier* fetchAddress COMMA vector COMMA reg SEMI 
-          | WMMA MMA qualifier* vector COMMA vector COMMA vector COMMA vector SEMI 
+statement : regStatement
+          | sharedStatement
+          | localStatement
+          | dollorStatement
+          | atStatement
+          | pragmaStatement
+          | retStatement
+          | barStatement
+          | braStatement
+          | rcpStatement
+          | ldStatement
+          | movStatement
+          | setpStatement
+          | cvtaStatement
+          | cvtStatement
+          | mulStatement
+          | divStatement
+          | subStatement
+          | addStatement
+          | shlStatement
+          | shrStatement
+          | maxStatement
+          | minStatement
+          | andStatement
+          | orStatement
+          | stStatement
+          | selpStatement
+          | madStatement
+          | fmaStatement
+          | wmmaStatement
           ;
+
+regStatement : REG qualifier reg (LESS DIGITS GREATER)? SEMI ;
+sharedStatement : SHARED ALIGN DIGITS qualifier ID LeftBracket DIGITS RightBracket SEMI ;
+localStatement : LOCAL ALIGN DIGITS qualifier ID LeftBracket DIGITS RightBracket SEMI ;
+dollorStatement : DOLLOR ID COLON ;
+atStatement : AT reg BRA DOLLOR ID SEMI ;
+pragmaStatement : PRAGMA STRING SEMI ;
+retStatement : RET SEMI ;
+barStatement : BAR qualifier+ DIGITS SEMI ;
+braStatement : BRA qualifier? DOLLOR ID SEMI ;
+rcpStatement : RCP qualifier+ reg COMMA reg SEMI ;
+ldStatement : LD qualifier* reg COMMA fetchAddress SEMI ;
+movStatement : MOV qualifier reg COMMA (reg|ID|DIGITS) SEMI ;
+setpStatement : SETP qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+cvtaStatement : CVTA qualifier* reg COMMA reg SEMI ;
+cvtStatement : CVT qualifier* reg COMMA reg SEMI ;
+mulStatement : MUL qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+divStatement : DIV qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+subStatement : SUB qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+addStatement : ADD qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+shlStatement : SHL qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+shrStatement : SHR qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+maxStatement : MAX qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+minStatement : MIN qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+andStatement : AND qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+orStatement : OR qualifier* reg COMMA reg COMMA (reg|DIGITS) SEMI ;
+stStatement : ST qualifier* fetchAddress COMMA (reg|vector) SEMI ;
+selpStatement : SELP qualifier* reg COMMA (reg|DIGITS) COMMA (reg|DIGITS) COMMA reg SEMI ;
+madStatement : MAD qualifier* reg COMMA (reg|DIGITS) COMMA (reg|DIGITS) COMMA reg SEMI ;
+fmaStatement : FMA qualifier* reg COMMA (reg|DIGITS) COMMA (reg|DIGITS) COMMA reg SEMI ;
+wmmaStatement : WMMA LOAD qualifier* vector COMMA fetchAddress COMMA reg SEMI 
+              | WMMA STORE qualifier* fetchAddress COMMA vector COMMA reg SEMI 
+              |  WMMA MMA qualifier* vector COMMA vector COMMA vector COMMA vector SEMI 
+              ;
 
 reg : PERCENT (ID | ID DOT ID) ;
 vector : LeftBrace reg RightBrace 

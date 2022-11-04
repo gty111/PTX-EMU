@@ -11,7 +11,6 @@
 .reg .b32 %r<2>;
 .reg .b64 %rd<5>;
 
-
 ld.param.u64 %rd1, [_Z5dummyPi_param_0];
 cvta.to.global.u64 %rd2, %rd1;
 mov.u32 %r1, %tid.x;
