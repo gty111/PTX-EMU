@@ -1,0 +1,437 @@
+.version 7.7
+.target sm_80
+.address_size 64
+
+
+
+.visible .entry _Z10testKernelIhEvPT_PKS0_i(
+.param .u64 _Z10testKernelIhEvPT_PKS0_i_param_0,
+.param .u64 _Z10testKernelIhEvPT_PKS0_i_param_1,
+.param .u32 _Z10testKernelIhEvPT_PKS0_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b16 %rs<2>;
+.reg .b32 %r<6>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelIhEvPT_PKS0_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelIhEvPT_PKS0_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelIhEvPT_PKS0_i_param_2];
+mov.u32 %r3, %ntid.x;
+mov.u32 %r4, %ctaid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r3, %r4, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB0_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+cvt.s64.s32 %rd4, %r1;
+add.s64 %rd5, %rd3, %rd4;
+ld.global.nc.u8 %rs1, [%rd5];
+cvta.to.global.u64 %rd6, %rd1;
+add.s64 %rd7, %rd6, %rd4;
+st.global.u8 [%rd7], %rs1;
+
+$L__BB0_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelI17uchar4_misalignedEvPT_PKS1_i(
+.param .u64 _Z10testKernelI17uchar4_misalignedEvPT_PKS1_i_param_0,
+.param .u64 _Z10testKernelI17uchar4_misalignedEvPT_PKS1_i_param_1,
+.param .u32 _Z10testKernelI17uchar4_misalignedEvPT_PKS1_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b16 %rs<5>;
+.reg .b32 %r<6>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelI17uchar4_misalignedEvPT_PKS1_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelI17uchar4_misalignedEvPT_PKS1_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelI17uchar4_misalignedEvPT_PKS1_i_param_2];
+mov.u32 %r3, %ctaid.x;
+mov.u32 %r4, %ntid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r4, %r3, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB1_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+mul.wide.s32 %rd4, %r1, 4;
+add.s64 %rd5, %rd3, %rd4;
+ld.global.nc.u8 %rs1, [%rd5];
+ld.global.nc.u8 %rs2, [%rd5+1];
+ld.global.nc.u8 %rs3, [%rd5+2];
+ld.global.nc.u8 %rs4, [%rd5+3];
+cvta.to.global.u64 %rd6, %rd1;
+add.s64 %rd7, %rd6, %rd4;
+st.global.u8 [%rd7], %rs1;
+st.global.u8 [%rd7+1], %rs2;
+st.global.u8 [%rd7+2], %rs3;
+st.global.u8 [%rd7+3], %rs4;
+
+$L__BB1_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelI14uchar4_alignedEvPT_PKS1_i(
+.param .u64 _Z10testKernelI14uchar4_alignedEvPT_PKS1_i_param_0,
+.param .u64 _Z10testKernelI14uchar4_alignedEvPT_PKS1_i_param_1,
+.param .u32 _Z10testKernelI14uchar4_alignedEvPT_PKS1_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b32 %r<7>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelI14uchar4_alignedEvPT_PKS1_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelI14uchar4_alignedEvPT_PKS1_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelI14uchar4_alignedEvPT_PKS1_i_param_2];
+mov.u32 %r3, %ntid.x;
+mov.u32 %r4, %ctaid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r3, %r4, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB2_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+cvta.to.global.u64 %rd4, %rd1;
+mul.wide.s32 %rd5, %r1, 4;
+add.s64 %rd6, %rd4, %rd5;
+add.s64 %rd7, %rd3, %rd5;
+ld.global.nc.u32 %r6, [%rd7];
+st.global.u32 [%rd6], %r6;
+
+$L__BB2_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelItEvPT_PKS0_i(
+.param .u64 _Z10testKernelItEvPT_PKS0_i_param_0,
+.param .u64 _Z10testKernelItEvPT_PKS0_i_param_1,
+.param .u32 _Z10testKernelItEvPT_PKS0_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b16 %rs<2>;
+.reg .b32 %r<6>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelItEvPT_PKS0_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelItEvPT_PKS0_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelItEvPT_PKS0_i_param_2];
+mov.u32 %r3, %ntid.x;
+mov.u32 %r4, %ctaid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r3, %r4, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB3_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+mul.wide.s32 %rd4, %r1, 2;
+add.s64 %rd5, %rd3, %rd4;
+ld.global.nc.u16 %rs1, [%rd5];
+cvta.to.global.u64 %rd6, %rd1;
+add.s64 %rd7, %rd6, %rd4;
+st.global.u16 [%rd7], %rs1;
+
+$L__BB3_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelIjEvPT_PKS0_i(
+.param .u64 _Z10testKernelIjEvPT_PKS0_i_param_0,
+.param .u64 _Z10testKernelIjEvPT_PKS0_i_param_1,
+.param .u32 _Z10testKernelIjEvPT_PKS0_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b32 %r<7>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelIjEvPT_PKS0_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelIjEvPT_PKS0_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelIjEvPT_PKS0_i_param_2];
+mov.u32 %r3, %ntid.x;
+mov.u32 %r4, %ctaid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r3, %r4, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB4_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+mul.wide.s32 %rd4, %r1, 4;
+add.s64 %rd5, %rd3, %rd4;
+ld.global.nc.u32 %r6, [%rd5];
+cvta.to.global.u64 %rd6, %rd1;
+add.s64 %rd7, %rd6, %rd4;
+st.global.u32 [%rd7], %r6;
+
+$L__BB4_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelI16uint2_misalignedEvPT_PKS1_i(
+.param .u64 _Z10testKernelI16uint2_misalignedEvPT_PKS1_i_param_0,
+.param .u64 _Z10testKernelI16uint2_misalignedEvPT_PKS1_i_param_1,
+.param .u32 _Z10testKernelI16uint2_misalignedEvPT_PKS1_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b32 %r<8>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelI16uint2_misalignedEvPT_PKS1_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelI16uint2_misalignedEvPT_PKS1_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelI16uint2_misalignedEvPT_PKS1_i_param_2];
+mov.u32 %r3, %ctaid.x;
+mov.u32 %r4, %ntid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r4, %r3, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB5_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+mul.wide.s32 %rd4, %r1, 8;
+add.s64 %rd5, %rd3, %rd4;
+ld.global.nc.u32 %r6, [%rd5];
+ld.global.nc.u32 %r7, [%rd5+4];
+cvta.to.global.u64 %rd6, %rd1;
+add.s64 %rd7, %rd6, %rd4;
+st.global.u32 [%rd7], %r6;
+st.global.u32 [%rd7+4], %r7;
+
+$L__BB5_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelI13uint2_alignedEvPT_PKS1_i(
+.param .u64 _Z10testKernelI13uint2_alignedEvPT_PKS1_i_param_0,
+.param .u64 _Z10testKernelI13uint2_alignedEvPT_PKS1_i_param_1,
+.param .u32 _Z10testKernelI13uint2_alignedEvPT_PKS1_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b32 %r<10>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelI13uint2_alignedEvPT_PKS1_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelI13uint2_alignedEvPT_PKS1_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelI13uint2_alignedEvPT_PKS1_i_param_2];
+mov.u32 %r3, %ntid.x;
+mov.u32 %r4, %ctaid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r3, %r4, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB6_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+mul.wide.s32 %rd4, %r1, 8;
+add.s64 %rd5, %rd3, %rd4;
+ld.global.nc.v2.u32 {%r6, %r7}, [%rd5];
+cvta.to.global.u64 %rd6, %rd1;
+add.s64 %rd7, %rd6, %rd4;
+st.global.v2.u32 [%rd7], {%r6, %r7};
+
+$L__BB6_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelI16uint3_misalignedEvPT_PKS1_i(
+.param .u64 _Z10testKernelI16uint3_misalignedEvPT_PKS1_i_param_0,
+.param .u64 _Z10testKernelI16uint3_misalignedEvPT_PKS1_i_param_1,
+.param .u32 _Z10testKernelI16uint3_misalignedEvPT_PKS1_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b32 %r<9>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelI16uint3_misalignedEvPT_PKS1_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelI16uint3_misalignedEvPT_PKS1_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelI16uint3_misalignedEvPT_PKS1_i_param_2];
+mov.u32 %r3, %ctaid.x;
+mov.u32 %r4, %ntid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r4, %r3, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB7_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+mul.wide.s32 %rd4, %r1, 12;
+add.s64 %rd5, %rd3, %rd4;
+ld.global.nc.u32 %r6, [%rd5];
+ld.global.nc.u32 %r7, [%rd5+4];
+ld.global.nc.u32 %r8, [%rd5+8];
+cvta.to.global.u64 %rd6, %rd1;
+add.s64 %rd7, %rd6, %rd4;
+st.global.u32 [%rd7], %r6;
+st.global.u32 [%rd7+4], %r7;
+st.global.u32 [%rd7+8], %r8;
+
+$L__BB7_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelI13uint3_alignedEvPT_PKS1_i(
+.param .u64 _Z10testKernelI13uint3_alignedEvPT_PKS1_i_param_0,
+.param .u64 _Z10testKernelI13uint3_alignedEvPT_PKS1_i_param_1,
+.param .u32 _Z10testKernelI13uint3_alignedEvPT_PKS1_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b32 %r<14>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelI13uint3_alignedEvPT_PKS1_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelI13uint3_alignedEvPT_PKS1_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelI13uint3_alignedEvPT_PKS1_i_param_2];
+mov.u32 %r3, %ntid.x;
+mov.u32 %r4, %ctaid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r3, %r4, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB8_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+cvta.to.global.u64 %rd4, %rd1;
+mul.wide.s32 %rd5, %r1, 16;
+add.s64 %rd6, %rd4, %rd5;
+add.s64 %rd7, %rd3, %rd5;
+ld.global.nc.v4.u32 {%r6, %r7, %r8, %r9}, [%rd7];
+st.global.v4.u32 [%rd6], {%r6, %r7, %r8, %r9};
+
+$L__BB8_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelI16uint4_misalignedEvPT_PKS1_i(
+.param .u64 _Z10testKernelI16uint4_misalignedEvPT_PKS1_i_param_0,
+.param .u64 _Z10testKernelI16uint4_misalignedEvPT_PKS1_i_param_1,
+.param .u32 _Z10testKernelI16uint4_misalignedEvPT_PKS1_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b32 %r<10>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelI16uint4_misalignedEvPT_PKS1_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelI16uint4_misalignedEvPT_PKS1_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelI16uint4_misalignedEvPT_PKS1_i_param_2];
+mov.u32 %r3, %ctaid.x;
+mov.u32 %r4, %ntid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r4, %r3, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB9_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+mul.wide.s32 %rd4, %r1, 16;
+add.s64 %rd5, %rd3, %rd4;
+ld.global.nc.u32 %r6, [%rd5];
+ld.global.nc.u32 %r7, [%rd5+4];
+ld.global.nc.u32 %r8, [%rd5+8];
+ld.global.nc.u32 %r9, [%rd5+12];
+cvta.to.global.u64 %rd6, %rd1;
+add.s64 %rd7, %rd6, %rd4;
+st.global.u32 [%rd7], %r6;
+st.global.u32 [%rd7+4], %r7;
+st.global.u32 [%rd7+8], %r8;
+st.global.u32 [%rd7+12], %r9;
+
+$L__BB9_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelI13uint4_alignedEvPT_PKS1_i(
+.param .u64 _Z10testKernelI13uint4_alignedEvPT_PKS1_i_param_0,
+.param .u64 _Z10testKernelI13uint4_alignedEvPT_PKS1_i_param_1,
+.param .u32 _Z10testKernelI13uint4_alignedEvPT_PKS1_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b32 %r<14>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelI13uint4_alignedEvPT_PKS1_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelI13uint4_alignedEvPT_PKS1_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelI13uint4_alignedEvPT_PKS1_i_param_2];
+mov.u32 %r3, %ntid.x;
+mov.u32 %r4, %ctaid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r3, %r4, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB10_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+cvta.to.global.u64 %rd4, %rd1;
+mul.wide.s32 %rd5, %r1, 16;
+add.s64 %rd6, %rd4, %rd5;
+add.s64 %rd7, %rd3, %rd5;
+ld.global.nc.v4.u32 {%r6, %r7, %r8, %r9}, [%rd7];
+st.global.v4.u32 [%rd6], {%r6, %r7, %r8, %r9};
+
+$L__BB10_2:
+ret;
+
+}
+
+.visible .entry _Z10testKernelI15uint4_aligned_2EvPT_PKS1_i(
+.param .u64 _Z10testKernelI15uint4_aligned_2EvPT_PKS1_i_param_0,
+.param .u64 _Z10testKernelI15uint4_aligned_2EvPT_PKS1_i_param_1,
+.param .u32 _Z10testKernelI15uint4_aligned_2EvPT_PKS1_i_param_2
+)
+{
+.reg .pred %p<2>;
+.reg .b32 %r<22>;
+.reg .b64 %rd<8>;
+
+
+ld.param.u64 %rd1, [_Z10testKernelI15uint4_aligned_2EvPT_PKS1_i_param_0];
+ld.param.u64 %rd2, [_Z10testKernelI15uint4_aligned_2EvPT_PKS1_i_param_1];
+ld.param.u32 %r2, [_Z10testKernelI15uint4_aligned_2EvPT_PKS1_i_param_2];
+mov.u32 %r3, %ntid.x;
+mov.u32 %r4, %ctaid.x;
+mov.u32 %r5, %tid.x;
+mad.lo.s32 %r1, %r3, %r4, %r5;
+setp.ge.s32 %p1, %r1, %r2;
+@%p1 bra $L__BB11_2;
+
+cvta.to.global.u64 %rd3, %rd2;
+cvta.to.global.u64 %rd4, %rd1;
+mul.wide.s32 %rd5, %r1, 32;
+add.s64 %rd6, %rd4, %rd5;
+add.s64 %rd7, %rd3, %rd5;
+ld.global.nc.v4.u32 {%r6, %r7, %r8, %r9}, [%rd7];
+ld.global.nc.v4.u32 {%r14, %r15, %r16, %r17}, [%rd7+16];
+st.global.v4.u32 [%rd6], {%r6, %r7, %r8, %r9};
+st.global.v4.u32 [%rd6+16], {%r14, %r15, %r16, %r17};
+
+$L__BB11_2:
+ret;
+
+}
+
