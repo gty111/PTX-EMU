@@ -18,6 +18,8 @@ PARAM: '.param' ;
 
 MAXNTID: '.maxntid' ;
 
+MINNCTAPERSM: '.minnctapersm' ;
+
 REG: '.reg' ;
 
 LOCAL: '.local' ;
@@ -41,6 +43,8 @@ SYNC: '.sync' ;
 LO: '.lo' ;
 
 GE: '.ge' ;
+
+GEU: '.geu' ;
 
 RN: '.rn' ;
 
@@ -69,6 +73,28 @@ ALIGNED: '.aligned' ;
 M8N8K4: '.m8n8k4' ;
 
 M16N16K16: '.m16n16k16' ;
+
+NEU: '.neu' ;
+
+NC: '.nc' ;
+
+APPROX: '.approx' ;
+
+FTZ: '.ftz' ;
+
+LTU: '.ltu' ;
+
+GTU: '.gtu' ;
+
+LE: '.le' ;
+
+LEU: '.leu' ;
+
+DOTADD: '.add';
+
+DOTOR: '.or';
+
+RZI: '.rzi' ;
 
 /* ************ */
 
@@ -121,6 +147,26 @@ MIN: 'min' ;
 RCP: 'rcp' ;
 
 WMMA: 'wmma' ;
+
+NEG: 'neg' ;
+
+NOT: 'not' ;
+
+SQRT: 'sqrt' ;
+
+COS: 'cos' ;
+
+LG2: 'lg2' ;
+
+EX2: 'ex2' ;
+
+ATOM: 'atom' ;
+
+XOR: 'xor' ;
+
+ABS: 'abs' ;
+
+SIN: 'sin' ;
 
 /* ************ */
 DOUBLEQUOTES: '"' ;
@@ -196,6 +242,8 @@ S16: '.s16' ;
 S32: '.s32' ;
 
 S64: '.s64' ;
+
+V2: '.v2' ;
 
 V4: '.v4' ;
 

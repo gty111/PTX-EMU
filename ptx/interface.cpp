@@ -31,6 +31,7 @@ enum Qualifier{
   Q_S16,
   Q_S32,
   Q_S64,
+  Q_V2,
   Q_V4,
   Q_PARAM,
   Q_GLOBAL,
@@ -53,7 +54,16 @@ enum Qualifier{
   Q_ROW,
   Q_ALIGNED,
   Q_M8N8K4,
-  Q_M16N16K16
+  Q_M16N16K16,
+  Q_NEU,
+  Q_NC,
+  Q_FTZ,
+  Q_APPROX,
+  Q_LTU,
+  Q_LE,
+  Q_GTU,
+  Q_RZI,
+  Q_DOTOR
 };
 
 enum StatementType{
