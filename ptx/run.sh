@@ -6,7 +6,7 @@ LINKPATH="/root/antlr4/runtime/Cpp/run/usr/local/lib"
 # export LD_LIBRARY_PATH=/root/antlr4/runtime/Cpp/run/usr/local/lib:$LD_LIBRARY_PATH
 INCLUDEPATH="/root/antlr4/runtime/Cpp/runtime/src"
 # -fPIC -shared
-CPPARG="${BUILD_DIR}/*.cpp -g -std=c++17 -I${INCLUDEPATH} -L${LINKPATH} -lantlr4-runtime -pthread -o ${LIB_DIR}/ptx-parser"
+CPPARG="${BUILD_DIR}/*.cpp -g -std=c++2a -I${INCLUDEPATH} -L${LINKPATH} -lantlr4-runtime -pthread -o ${LIB_DIR}/ptx-parser"
 
 rm -rf ${BUILD_DIR}/*
 [ ! -d ${BUILD_DIR} ] && mkdir ${BUILD_DIR}

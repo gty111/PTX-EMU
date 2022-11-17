@@ -167,11 +167,11 @@ class OperandContext {
       public:
         std::vector<OperandContext> vec;
       
-      VEC(){}
+        VEC(){}
 
-      VEC(const VEC &v){
-        this->vec = v.vec;
-      }
+        VEC(const VEC &v){
+          this->vec = v.vec;
+        }
     };
     class FA{ //fetch address
       public:
@@ -424,10 +424,10 @@ class KernelContext{
 
 class PtxContext{
   public:
-    int ptxMajorVersion; //done
-    int ptxMinorVersion; //done
-    int ptxTarget; //done
-    int ptxAddressSize; //done
+    int ptxMajorVersion; 
+    int ptxMinorVersion; 
+    int ptxTarget; 
+    int ptxAddressSize; 
 
     std::vector<KernelContext> ptxKernels;
 };
@@ -467,6 +467,112 @@ class PtxListener : public ptxParserBaseListener{
       oc.operand = op.front()->operand;
       oc.opType = op.front()->opType;
       op.pop();
+    }
+
+    static std::string Q2s(Qualifier q){
+      switch(q){
+      case Q_U64:return ".u64";
+      case Q_U32:return ".u32";
+      case Q_U16:return ".u16";
+      case Q_U8:return ".u8";
+      case Q_PRED:return ".pred";
+      case Q_B8:return ".b8";
+      case Q_B16:return ".b16";
+      case Q_B32:return ".b32";
+      case Q_B64:return ".b64";
+      case Q_F8:return ".f8";
+      case Q_F16:return ".f16";
+      case Q_F32:return ".f32";
+      case Q_F64:return ".f64";
+      case Q_S8:return ".s8";
+      case Q_S16:return ".s16";
+      case Q_S32:return ".s32";
+      case Q_S64:return ".s64";
+      case Q_V2:return ".v2";
+      case Q_V4:return ".v4";
+      case Q_PARAM:return ".param";
+      case Q_GLOBAL:return ".global";
+      case Q_LOCAL:return ".local";
+      case Q_SHARED:return ".shared";
+      case Q_GT:return ".gt";
+      case Q_GE:return ".ge";
+      case Q_EQ:return ".eq";
+      case Q_NE:return ".ne";
+      case Q_LT:return ".lt";
+      case Q_TO:return ".to";
+      case Q_WIDE:return ".wide";
+      case Q_SYNC:return ".sync";
+      case Q_LO:return ".lo";
+      case Q_UNI:return ".uni";
+      case Q_RN:return ".rn";
+      case Q_A:return ".a";
+      case Q_B:return ".b";
+      case Q_D:return ".d";
+      case Q_ROW:return ".row";
+      case Q_ALIGNED:return ".aligned";
+      case Q_M8N8K4:return ".m8n8k4";
+      case Q_M16N16K16:return ".m16n16k16";
+      case Q_NEU:return ".neu";
+      case Q_NC:return ".nc";
+      case Q_FTZ:return ".ftz";
+      case Q_APPROX:return ".approx";
+      case Q_LTU:return ".ltu";
+      case Q_LE:return ".le";
+      case Q_GTU:return ".gtu";
+      case Q_LEU:return ".leu";
+      case Q_DOTADD:return ".add";
+      case Q_GEU:return ".geu";
+      case Q_RZI:return ".rzi";
+      case Q_DOTOR:return ".or";
+      default:assert(0);
+      }
+    }
+
+    static std::string S2s(StatementType s){
+      switch (s)
+      {
+      case S_REG:return "reg";
+      case S_SHARED:return "shared";
+      case S_LOCAL:return "local";
+      case S_DOLLOR:return "$";
+      case S_AT:return "@";
+      case S_PRAGMA:return "pragma";
+      case S_RET:return "ret";
+      case S_BAR:return "bar";
+      case S_BRA:return "bra";
+      case S_RCP:return "rcp";
+      case S_LD:return "ld";
+      case S_MOV:return "mov";
+      case S_SETP:return "setp";
+      case S_CVTA:return "cvta";
+      case S_CVT:return "cvt";
+      case S_MUL:return "mul";
+      case S_DIV:return "div";
+      case S_SUB:return "sub";
+      case S_ADD:return "add";
+      case S_SHL:return "shl";
+      case S_SHR:return "shr";
+      case S_MAX:return "max";
+      case S_MIN:return "min";
+      case S_AND:return "and";
+      case S_OR:return "or";
+      case S_ST:return "st";
+      case S_SELP:return "selp";
+      case S_MAD:return "mad";
+      case S_FMA:return "fma";
+      case S_WMMA:return "wmma";
+      case S_NEG:return "neg";
+      case S_NOT:return "not";
+      case S_SQRT:return "sqrt";
+      case S_COS:return "cos";
+      case S_LG2:return "lg2";
+      case S_EX2:return "ex2";
+      case S_ATOM:return "atom";
+      case S_XOR:return "xor";
+      case S_ABS:return "abs";
+      case S_SIN:return "sin";
+      default:assert(0);
+      }
     }
 
     /* listener function */
@@ -567,7 +673,7 @@ class PtxListener : public ptxParserBaseListener{
       /* end of parsing kernel */
       ptxContext.ptxKernels.push_back(*kernelContext);
       std::cout << __func__ << std::endl;
-      delete kernelContext;
+      kernelContext = nullptr;
     }
 
 
@@ -1777,6 +1883,46 @@ class PtxListener : public ptxParserBaseListener{
     }
 };
 
+void test_semantic(PtxListener &tl){
+  PtxContext &ptx = tl.ptxContext;
+  std::printf(".version %d.%d\n",ptx.ptxMajorVersion,ptx.ptxMinorVersion);
+  std::printf(".target sm_%d\n",ptx.ptxTarget);
+  std::printf(".address_size %d\n",ptx.ptxAddressSize);
+  std::printf("number of kernel %d\n",ptx.ptxKernels.size());
+  for(int i=0;i<ptx.ptxKernels.size();i++){
+    KernelContext &kernel = ptx.ptxKernels[i];
+    if(kernel.ifEntryKernel){
+      std::printf(".entry ");
+    }
+    if(kernel.ifVisibleKernel){
+      std::printf(".visible ");
+    }
+    std::printf("%s\n",kernel.kernelName.c_str());
+    std::printf("number of param %d\n",kernel.kernelParams.size());
+    for(int i=0;i<kernel.kernelParams.size();i++){
+      ParamContext &param = kernel.kernelParams[i];
+      std::printf("%s: ",param.paramName.c_str());
+      if(param.paramAlign!=0){
+        std::printf("align %d ",param.paramAlign);
+      }
+      std::printf("%s ",tl.Q2s(param.paramType).c_str());
+      if(param.paramNum!=0){
+        std::printf("arraySize %d ",param.paramNum);
+      }
+      std::printf("\n");
+    }
+    std::printf("number of statements %d\n",kernel.kernelStatements.size());
+    for(int i=0;i<kernel.kernelStatements.size();i++){
+      StatementContext stat = kernel.kernelStatements[i];
+      std::printf("%s %p\n",tl.S2s(stat.statementType).c_str(),stat.statement);
+    }
+  }
+}
+
+// #define TOKEN
+// #define TREE
+#define SEMANTIC
+
 int main(int argc, const char* argv[]) {
   assert(argc>=2);
   std::ifstream stream;
@@ -1787,17 +1933,29 @@ int main(int argc, const char* argv[]) {
   CommonTokenStream tokens(&lexer);
 
   tokens.fill();
+
+ #ifdef TOKEN
+  // output tokens
   for (auto token : tokens.getTokens()) {
     std::cout << token->toString() << std::endl;
   }
+ #endif
 
   ptxParser parser(&tokens);
   PtxListener tl;
   parser.addParseListener(&tl);
 
   tree::ParseTree *tree = parser.ast();
-  
+ 
+ #ifdef TREE
+  // output grammar tree
   std::cout << tree->toStringTree(&parser) << std::endl << std::endl;
+ #endif
+
+ #ifdef SEMANTIC
+  // output semantic
+  test_semantic(tl);
+ #endif
 
   return 0;
 }
