@@ -31,8 +31,7 @@ ncu: bin
 cuobjdump: bin/${APP}
 	$(shell [ ! -d $(CUOBJDUMP_OUT) ] && mkdir $(CUOBJDUMP_OUT)) 
 	cuobjdump $(CUOBJDUMP_ARG) $^ >$(CUOBJDUMP_OUTFILE)
-# lib: src/$(APP).$(SUFFIX)
-# 	g++ $(addprefix -I,$(INCLUDE_DIR)) -fPIC -shared -Wl,--version-script=linux-so-version.txt $^ -o bin/$(LIB_OUT)
+
 lib: 
 	$(shell [ ! -d lib ] && mkdir lib)
 	make -C ptx
