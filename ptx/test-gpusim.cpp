@@ -9,7 +9,16 @@
 #include<map>
 #include<cstdint>
 
+#include "antlr4-runtime.h"
+#include "ptxLexer.h"
+#include "ptxParser.h"
+#include "ptxParserBaseListener.h"
+#include "interface.h"
+
 #define __my_func__ __func__
+
+using namespace ptxparser;
+using namespace antlr4;
 
 std::string ptx_buffer;
 std::map<uint64_t,std::string>func2name;
@@ -63,6 +72,17 @@ void** __cudaRegisterFatBinary(
         // clean intermediate file
         snprintf(cmd,1024,"rm __ptx_list__ %s",ptx_file.c_str());
         system(cmd);
+
+        // launch antlr4 parse
+        ANTLRInputStream input(ptx_buffer);
+        ptxLexer lexer(&input);
+        CommonTokenStream tokens(&lexer);
+        tokens.fill();
+        ptxParser parser(&tokens);
+        PtxListener tl;
+        parser.addParseListener(&tl);
+        tree::ParseTree *tree = parser.ast();
+        test_semantic(tl);
     }
     return nullptr;
 }
@@ -99,6 +119,7 @@ cudaError_t cudaMalloc(
     size_t s
 )
 {
+    *p = malloc(s);
     printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
@@ -169,6 +190,7 @@ cudaError_t cudaFree(
     void *devPtr
 )
 {
+    free(devPtr);
     printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
@@ -203,6 +225,7 @@ cudaError_t cudaLaunchKernel(
     //printf("%s\n",ptx_buffer.c_str());
     printf("EMU: deviceFunName %s\n",func2name[(uint64_t)func].c_str());
     printf("EMU: arg %p\n",args);
+
     return cudaSuccess;
 }
 
@@ -218,6 +241,62 @@ void __cudaRegisterVar(
 ) 
 {
     printf("EMU: call %s\n",__my_func__);
+}
+
+cudaError_t cudaMallocManaged ( 
+    void**        devPtr, 
+    size_t        size, 
+    unsigned int  flags = cudaMemAttachGlobal 
+)
+{
+    *devPtr = malloc(size);
+    printf("EMU: call %s\n",__my_func__);
+    return cudaSuccess;
+}
+
+cudaError_t cudaDeviceSynchronize ( 
+    void
+)
+{
+    printf("EMU: call %s\n",__my_func__);
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemset (
+    void* devPtr,
+    int  value, 
+    size_t count 
+)
+{
+    printf("EMU: call %s\n",__my_func__);
+    return cudaSuccess;
+}
+
+cudaError_t cudaGetLastError ( 
+    void 
+)
+{
+    printf("EMU: call %s\n",__my_func__);
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemsetAsync ( 
+    void*        devPtr, 
+    int          value, 
+    size_t       count, 
+    cudaStream_t stream = 0 
+)
+{
+    printf("EMU: call %s\n",__my_func__);
+    return cudaSuccess;
+}
+
+cudaError_t cudaPeekAtLastError ( 
+    void 
+)
+{
+    printf("EMU: call %s\n",__my_func__);
+    return cudaSuccess;
 }
 
 } // end of extern "C"

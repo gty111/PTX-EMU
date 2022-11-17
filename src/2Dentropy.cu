@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 #include <functional>
 #include <vector>
+#include <cstdint>
 template <int BLOCK_DIM_X = 128, typename TIN = uint8_t, typename TOUT = float,
           typename TCNT = uint8_t, int CNT_DIM = 256, int CONV_DIM = 2>
 static void __global__ __launch_bounds__(BLOCK_DIM_X)

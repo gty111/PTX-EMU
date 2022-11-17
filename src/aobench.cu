@@ -404,7 +404,7 @@ int main(int argc, char **argv)
   printf( "Total render time (%d iterations): %f sec.\n", LOOPMAX, msec / 1000.0 );
   printf( "Average render time: %f sec.\n", msec / 1000.0 / (float)LOOPMAX );
 
-  saveppm( "ao.ppm", WIDTH, HEIGHT, img );
+  //saveppm( "ao.ppm", WIDTH, HEIGHT, img );
   free( img );
 
   return 0;
