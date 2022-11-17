@@ -144,9 +144,9 @@ dollorStatement : DOLLOR ID COLON ;
 atStatement : AT operand BRA DOLLOR ID SEMI ;
 pragmaStatement : PRAGMA STRING SEMI ;
 retStatement : RET SEMI ;
-barStatement : BAR qualifier+ DIGITS SEMI ;
-braStatement : BRA qualifier? DOLLOR ID SEMI ;
-rcpStatement : RCP qualifier+ operandTwo SEMI ;
+barStatement : BAR qualifier* DIGITS SEMI ;
+braStatement : BRA qualifier* DOLLOR ID SEMI ;
+rcpStatement : RCP qualifier* operandTwo SEMI ;
 ldStatement : LD qualifier* operandTwo SEMI ;
 movStatement : MOV qualifier operandTwo SEMI ;
 setpStatement : SETP qualifier* operandThree SEMI ;
@@ -163,7 +163,7 @@ minStatement : MIN qualifier* operandThree SEMI ;
 andStatement : AND qualifier* operandThree SEMI ;
 orStatement : OR qualifier* operandThree SEMI ;
 stStatement : ST qualifier* operandTwo SEMI ;
-selpStatement : SELP qualifier operandFour SEMI ;
+selpStatement : SELP qualifier* operandFour SEMI ;
 madStatement : MAD qualifier* operandFour SEMI ;
 fmaStatement : FMA qualifier* operandFour SEMI ;
 wmmaStatement : WMMA LOAD qualifier* operandThree SEMI 
@@ -171,7 +171,7 @@ wmmaStatement : WMMA LOAD qualifier* operandThree SEMI
               | WMMA MMA qualifier* operandFour SEMI 
               ;
 negStatement : NEG qualifier* operandTwo SEMI ;
-notStatement : NOT qualifier operandTwo SEMI ;
+notStatement : NOT qualifier* operandTwo SEMI ;
 sqrtStatement : SQRT qualifier* operandTwo SEMI ;
 cosStatement : COS qualifier* operandTwo SEMI ;
 lg2Statement : LG2 qualifier* operandTwo SEMI ;
@@ -198,7 +198,7 @@ var : ID ;
 
 reg : PERCENT (ID | ID DOT ID) ;
 
-regi : PERCENT (ID | ID DOT ID) ; // reg in vector
+regi : PERCENT (ID | ID DOT ID) ; // reg in vector or fetchAddress
 
 vector : LeftBrace regi RightBrace 
        | LeftBrace regi COMMA regi RightBrace

@@ -13,7 +13,6 @@ using namespace ptxparser;
 using namespace antlr4;
 
 enum Qualifier{
-  Q_NONE,
   Q_U64,
   Q_U32,
   Q_U16,
@@ -62,6 +61,9 @@ enum Qualifier{
   Q_LTU,
   Q_LE,
   Q_GTU,
+  Q_LEU,
+  Q_DOTADD,
+  Q_GEU,
   Q_RZI,
   Q_DOTOR
 };
@@ -96,7 +98,17 @@ enum StatementType{
   S_SELP,
   S_MAD,
   S_FMA,
-  S_WMMA
+  S_WMMA,
+  S_NEG,
+  S_NOT,
+  S_SQRT,
+  S_COS,
+  S_LG2,
+  S_EX2,
+  S_ATOM,
+  S_XOR,
+  S_ABS,
+  S_SIN
 };
 
 enum OpType{
@@ -183,21 +195,21 @@ class StatementContext{
     void *statement;
     class REG {
       public:
-        Qualifier regDataType;
+        std::vector<Qualifier> regDataType;
         std::string regMajorName,regMinorName;
         int regNum;
     };
     class SHARED {
       public:
         int sharedAlign;
-        Qualifier sharedDataType;
+        std::vector<Qualifier> sharedDataType;
         std::string sharedName;
         int sharedSize;
     };
     class LOCAL {
       public:
         int localAlign;
-        Qualifier localDataType;
+        std::vector<Qualifier> localDataType;
         std::string localName;
         int localSize;
     };
@@ -223,7 +235,7 @@ class StatementContext{
     };
     class BRA {
       public:
-        Qualifier braQualifier;
+        std::vector<Qualifier> braQualifier;
         std::string braLabel;
     };
     class RCP {
@@ -238,7 +250,7 @@ class StatementContext{
     };
     class MOV {
       public:
-        Qualifier movQualifier;
+        std::vector<Qualifier> movQualifier;
         OperandContext movOp[2];
     };
     class SETP {
@@ -313,7 +325,7 @@ class StatementContext{
     };
     class SELP{
       public:
-        Qualifier selpQualifier;
+        std::vector<Qualifier> selpQualifier;
         OperandContext selpOp[4];
     };
     class MAD{
@@ -332,12 +344,66 @@ class StatementContext{
         std::vector<Qualifier> wmmaQualifier;
         OperandContext wmmaOp[4]; 
     };
+    class NEG{
+      public:
+        std::vector<Qualifier> negQualifier;
+        OperandContext negOp[2];
+    };
+    class NOT{
+      public:
+        std::vector<Qualifier> notQualifier;
+        OperandContext notOp[2];
+    };
+    class SQRT{
+      public:
+        std::vector<Qualifier> sqrtQualifier;
+        OperandContext sqrtOp[2];
+    };
+    class COS{
+      public:
+        std::vector<Qualifier> cosQualifier;
+        OperandContext cosOp[2];
+    };
+    class LG2{
+      public:
+        std::vector<Qualifier> lg2Qualifier;
+        OperandContext lg2Op[2];
+    };
+    class EX2{
+      public:
+        std::vector<Qualifier> ex2Qualifier;
+        OperandContext ex2Op[2];
+    };
+    class ATOM{
+      public:
+        std::vector<Qualifier> atomQualifier;
+        OperandContext atomOp[4];
+        int operandNum;
+    };
+    class XOR{
+      public:
+        std::vector<Qualifier> xorQualifier;
+        OperandContext xorOp[3];
+    };
+    class ABS{
+      public:
+        std::vector<Qualifier> absQualifier;
+        OperandContext absOp[2];
+    };
+    class SIN{
+      public:
+        std::vector<Qualifier> sinQualifier;
+        OperandContext sinOp[2];
+    };
 };
+
 
 class ParamContext{
   public:
     Qualifier paramType;
     std::string paramName;
+    int paramAlign;
+    int paramNum;
 };
 
 class KernelContext{
@@ -345,6 +411,12 @@ class KernelContext{
     bool ifVisibleKernel;
     bool ifEntryKernel;
     std::string kernelName;
+    class Maxntid{
+      public:
+        int x,y,z;
+    };
+    Maxntid maxntid;
+    int minnctapersm;
 
     std::vector<ParamContext> kernelParams;
     std::vector<StatementContext> kernelStatements;
@@ -400,25 +472,24 @@ class PtxListener : public ptxParserBaseListener{
     /* listener function */
 
     void enterAst(ptxParser::AstContext *ctx) override{
-      std::cout << "enter ast" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void exitAst(ptxParser::AstContext *ctx) override {
-      std::cout << "exit ast kernel num:" << ptxContext.ptxKernels.size() << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void enterVersionDes(ptxParser::VersionDesContext *ctx) override { 
-      std::cout << "enter versiondes" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitVersionDes(ptxParser::VersionDesContext *ctx) override { 
       auto digits = ctx->DIGITS();
       ptxContext.ptxMajorVersion = stoi(digits[0]->getText());
       ptxContext.ptxMinorVersion = stoi(digits[1]->getText());
-      std::cout << "exit versiondes " << ptxContext.ptxMajorVersion
-                << '.' << ptxContext.ptxMinorVersion << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterTargetDes(ptxParser::TargetDesContext *ctx) override { 
-      std::cout << "enter targetdes" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitTargetDes(ptxParser::TargetDesContext *ctx) override { 
       /* assume target always be 'sm_xx' */
@@ -426,40 +497,61 @@ class PtxListener : public ptxParserBaseListener{
       auto str = id->getText();
       assert(str.length()==5);
       ptxContext.ptxTarget = stoi(id->getText().substr(3,2));
-      std::cout << "exit targetdes " << ptxContext.ptxTarget << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterAddressDes(ptxParser::AddressDesContext *ctx) override { 
-      std::cout << "enter addressdes" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitAddressDes(ptxParser::AddressDesContext *ctx) override { 
       ptxContext.ptxAddressSize = stoi(ctx->DIGITS()->getText());
-      std::cout << "exit addressdes " << ptxContext.ptxAddressSize << std::endl;
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterPerformanceTuning(ptxParser::PerformanceTuningContext *ctx) override { 
+      std::cout << __func__ << std::endl;
+    }
+    void exitPerformanceTuning(ptxParser::PerformanceTuningContext *ctx) override { 
+      /* init val */
+      kernelContext->maxntid.x = 0;
+      kernelContext->maxntid.y = 0;
+      kernelContext->maxntid.z = 0;
+      
+      kernelContext->minnctapersm = 0;
+
+      /* extrac val */
+      if(ctx->MAXNTID()){
+        kernelContext->maxntid.x = stoi(ctx->DIGITS(0)->getText());
+        kernelContext->maxntid.y = stoi(ctx->DIGITS(1)->getText());
+        kernelContext->maxntid.z = stoi(ctx->DIGITS(2)->getText());
+      }else if(ctx->MINNCTAPERSM()){
+        kernelContext->minnctapersm = stoi(ctx->DIGITS(0)->getText());
+      }else assert(0 && "performancetuning not recognized!\n");
+
+      std::cout << __func__ << std::endl;
     }
 
     void enterKernels(ptxParser::KernelsContext *ctx) override { 
-      std::cout << "enter kernels" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitKernels(ptxParser::KernelsContext *ctx) override { 
-      std::cout << "exit kernels" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterKernel(ptxParser::KernelContext *ctx) override { 
       kernelContext = new KernelContext();
-      std::cout << "enter kernel" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitKernel(ptxParser::KernelContext *ctx) override { 
-      /* performanceTuning */
-      //TODO
 
       /* ID */
       kernelContext->kernelName = ctx->ID()->getText();
-      std::cout << kernelContext->kernelName << std::endl;
+      std::cout << __func__ << std::endl;
 
       /* entry */
       if(ctx->ENTRY()){
         kernelContext->ifEntryKernel = true;
-        std::cout << "entry" << std::endl;
+        std::cout << __func__ << std::endl;
       }else{
         kernelContext->ifEntryKernel = false;
       }
@@ -467,19 +559,21 @@ class PtxListener : public ptxParserBaseListener{
       /* visible */
       if(ctx->VISIBLE()){
         kernelContext->ifVisibleKernel = true;
-        std::cout << "visible" << std::endl;
+        std::cout << __func__ << std::endl;
       }else{
         kernelContext->ifVisibleKernel = false;
       }
 
       /* end of parsing kernel */
       ptxContext.ptxKernels.push_back(*kernelContext);
-      std::cout << "exit kernel " << "statement num:" << kernelContext->kernelStatements.size() << std::endl;
+      std::cout << __func__ << std::endl;
       delete kernelContext;
     }
 
+
+
     void enterQualifier(ptxParser::QualifierContext *ctx) override { 
-      std::cout << "enter qualifier" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitQualifier(ptxParser::QualifierContext *ctx) override { 
       if(ctx->U64()){
@@ -516,6 +610,8 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.push(Q_S32);
       }else if(ctx->S64()){
         qualifier.push(Q_S64);
+      }else if(ctx->V2()){
+        qualifier.push(Q_V2);
       }else if(ctx->V4()){
         qualifier.push(Q_V4);
       }else if(ctx->PARAM()){
@@ -562,25 +658,66 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.push(Q_M8N8K4);
       }else if(ctx->M16N16K16()){
         qualifier.push(Q_M16N16K16);
-      }
-      std::cout << "exit qualifier " << qualifier.back() << std::endl;
+      }else if(ctx->NEU()){
+        qualifier.push(Q_NEU);
+      }else if(ctx->NC()){
+        qualifier.push(Q_NC);
+      }else if(ctx->FTZ()){
+        qualifier.push(Q_FTZ);
+      }else if(ctx->APPROX()){
+        qualifier.push(Q_APPROX);
+      }else if(ctx->LTU()){
+        qualifier.push(Q_LTU);
+      }else if(ctx->LE()){
+        qualifier.push(Q_LE);
+      }else if(ctx->GTU()){
+        qualifier.push(Q_GTU);
+      }else if(ctx->LEU()){
+        qualifier.push(Q_LEU);
+      }else if(ctx->DOTADD()){
+        qualifier.push(Q_DOTADD);
+      }else if(ctx->GEU()){
+        qualifier.push(Q_GEU);
+      }else if(ctx->RZI()){
+        qualifier.push(Q_RZI);
+      }else if(ctx->DOTOR()){
+        qualifier.push(Q_DOTOR);
+      }else assert(0 && "some qualifier not recognized!\n");
+
+      std::cout << __func__ << std::endl;
     }
 
     void enterParams(ptxParser::ParamsContext *ctx) override { 
-      std::cout << "enter params" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitParams(ptxParser::ParamsContext *ctx) override { 
-      std::cout << "exit params" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterParam(ptxParser::ParamContext *ctx) override { 
       paramContext = new ParamContext();
-      std::cout << "enter param" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitParam(ptxParser::ParamContext *ctx) override { 
+      int digit_idx = 0;
 
       /* ID */
       paramContext->paramName = ctx->ID()->getText();
+
+      /* align */
+      if(ctx->ALIGN()){
+        digit_idx++;
+        paramContext->paramAlign = stoi(ctx->DIGITS(0)->getText());
+      }else{
+        paramContext->paramAlign = 0;
+      }
+
+      /* paramNum */
+      if(ctx->LeftBracket()){
+        paramContext->paramNum = stoi(ctx->DIGITS(digit_idx)->getText());
+      }else{
+        paramContext->paramNum = 0;
+      }
 
       /* qualifier */
       paramContext->paramType = qualifier.front();
@@ -588,45 +725,47 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end of parsing param */
       kernelContext->kernelParams.push_back(*paramContext);
-      std::cout << "exit param " << paramContext->paramName 
-                << " " << paramContext->paramType << std::endl;
+      std::cout << __func__ << std::endl;
       delete paramContext;
     }
 
     void enterCompoundStatement(ptxParser::CompoundStatementContext *ctx) override { 
-      std::cout << "enter compoundstatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitCompoundStatement(ptxParser::CompoundStatementContext *ctx) override { 
-      std::cout << "exit compoundstatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterStatements(ptxParser::StatementsContext *ctx) override { 
-      std::cout << "enter statements" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitStatements(ptxParser::StatementsContext *ctx) override { 
-      std::cout << "exit statements" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterStatement(ptxParser::StatementContext *ctx) override { 
-      std::cout << "enter statement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitStatement(ptxParser::StatementContext *ctx) override { 
       assert(op.size()==0);
       statementContext.statementType = statementType;
       statementContext.statement = statement;
       kernelContext->kernelStatements.push_back(statementContext);
-      std::cout << "exit statement " << statementType << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterRegStatement(ptxParser::RegStatementContext *ctx) override { 
       statement = new StatementContext::REG();
-      std::cout << "enter regStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitRegStatement(ptxParser::RegStatementContext *ctx) override { 
       auto st = (StatementContext::REG*) statement;
+
       /* qualifier */
-      st->regDataType = qualifier.front();
-      qualifier.pop();
+      while(qualifier.size()){
+        st->regDataType.push_back(qualifier.front());
+        qualifier.pop();
+      }
 
       /* reg */
       assert(op.size());
@@ -645,14 +784,12 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end */
       statementType = S_REG;
-      std::cout << "exit regStatement " << st->regDataType << ' '
-          << st->regMajorName << st->regMinorName << ' ' 
-          << st->regNum << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterSharedStatement(ptxParser::SharedStatementContext *ctx) override { 
       statement = new StatementContext::SHARED();
-      std::cout << "enter sharedStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitSharedStatement(ptxParser::SharedStatementContext *ctx) override { 
       auto st = (StatementContext::SHARED *)statement;
@@ -661,23 +798,29 @@ class PtxListener : public ptxParserBaseListener{
       st->sharedAlign = stoi(ctx->DIGITS(0)->getText());
 
       /* qualifier */
-      st->sharedDataType = qualifier.front();
-      qualifier.pop();
+      while(qualifier.size()){
+        st->sharedDataType.push_back(qualifier.front());
+        qualifier.pop();
+      }
 
       /* ID */
       st->sharedName = ctx->ID()->getText();
 
       /* size */
-      st->sharedSize = stoi(ctx->DIGITS(1)->getText());
+      if(ctx->DIGITS(1)){
+        st->sharedSize = stoi(ctx->DIGITS(1)->getText());
+      }else{
+        st->sharedSize = 0;
+      }
 
       /* end */
       statementType = S_SHARED;
-      std::cout << "exit sharedStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterLocalStatement(ptxParser::LocalStatementContext *ctx) override { 
       statement = new StatementContext::LOCAL();
-      std::cout << "enter localStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitLocalStatement(ptxParser::LocalStatementContext *ctx) override { 
       auto st = (StatementContext::LOCAL *)statement;
@@ -686,8 +829,10 @@ class PtxListener : public ptxParserBaseListener{
       st->localAlign = stoi(ctx->DIGITS(0)->getText());
 
       /* qualifier */
-      st->localDataType = qualifier.front();
-      qualifier.pop();
+      while(qualifier.size()){
+        st->localDataType.push_back(qualifier.front());
+        qualifier.pop();
+      }
 
       /* ID */
       st->localName = ctx->ID()->getText();
@@ -697,12 +842,12 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end */
       statementType = S_LOCAL;
-      std::cout << "exit localStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterDollorStatement(ptxParser::DollorStatementContext *ctx) override { 
       statement = new StatementContext::DOLLOR();
-      std::cout << "enter dolorStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitDollorStatement(ptxParser::DollorStatementContext *ctx) override { 
       auto st = (StatementContext::DOLLOR *)statement;
@@ -712,12 +857,12 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end */
       statementType = S_DOLLOR;
-      std::cout << "exit dolorStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterAtStatement(ptxParser::AtStatementContext *ctx) override { 
       statement = new StatementContext::AT();
-      std::cout << "enter atStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitAtStatement(ptxParser::AtStatementContext *ctx) override { 
       auto st = (StatementContext::AT *)statement;
@@ -730,12 +875,12 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end */
       statementType = S_AT;
-      std::cout << "exit atStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterPragmaStatement(ptxParser::PragmaStatementContext *ctx) override { 
       statement = new StatementContext::PRAGMA();
-      std::cout << "enter pragmaStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitPragmaStatement(ptxParser::PragmaStatementContext *ctx) override { 
       auto st = (StatementContext::PRAGMA *)statement;
@@ -745,23 +890,23 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end */
       statementType = S_PRAGMA;
-      std::cout << "exit pragmaStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterRetStatement(ptxParser::RetStatementContext *ctx) override { 
       statement = new StatementContext::RET();
-      std::cout << "enter retStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitRetStatement(ptxParser::RetStatementContext *ctx) override { 
       auto st = (StatementContext::RET *)statement;
       /* end */
       statementType = S_RET;
-      std::cout << "exit retStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterBarStatement(ptxParser::BarStatementContext *ctx) override { 
       statement = new StatementContext::BAR();
-      std::cout << "enter barStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitBarStatement(ptxParser::BarStatementContext *ctx) override {
       auto st = (StatementContext::BAR *)statement;
@@ -777,20 +922,19 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end */
       statementType = S_BAR; 
-      std::cout << "exit barStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterBraStatement(ptxParser::BraStatementContext *ctx) override { 
       statement = new StatementContext::BRA();
-      std::cout << "enter braStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitBraStatement(ptxParser::BraStatementContext *ctx) override {
       auto st = (StatementContext::BRA *)statement; 
 
       /* qualifier */
-      st->braQualifier = Q_NONE;
       if(qualifier.size()){
-        st->braQualifier = qualifier.front();
+        st->braQualifier.push_back(qualifier.front());
         qualifier.pop();
       }
 
@@ -799,12 +943,12 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end */
       statementType = S_BRA;
-      std::cout << "exit braStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterRcpStatement(ptxParser::RcpStatementContext *ctx) override { 
       statement = new StatementContext::RCP();
-      std::cout << "enter rcpStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitRcpStatement(ptxParser::RcpStatementContext *ctx) override { 
       auto st = (StatementContext::RCP *)statement;
@@ -822,12 +966,12 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end */
       statementType = S_RCP;
-      std::cout << "exit rcpStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterLdStatement(ptxParser::LdStatementContext *ctx) override { 
       statement = new StatementContext::LD();
-      std::cout << "enter ldStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitLdStatement(ptxParser::LdStatementContext *ctx) override {
       auto st = (StatementContext::LD *)statement;
@@ -838,40 +982,42 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1 */
+      /* op2 */
       for(int i=0;i<2;i++){
         fetchOperand(st->ldOp[i]);
       }
 
       /* end */
       statementType = S_LD; 
-      std::cout << "exit ldStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterMovStatement(ptxParser::MovStatementContext *ctx) override { 
       statement = new StatementContext::MOV();
-      std::cout << "enter movStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitMovStatement(ptxParser::MovStatementContext *ctx) override { 
       auto st = (StatementContext::MOV *)statement;
 
       /* qualifier */
-      st->movQualifier = qualifier.front();
-      qualifier.pop();
+      while(qualifier.size()){
+        st->movQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
 
-      /* op0,1 */
+      /* op2 */
       for(int i=0;i<2;i++){
         fetchOperand(st->movOp[i]);
       }
 
       /* end */
       statementType = S_MOV;
-      std::cout << "exit movStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterSetpStatement(ptxParser::SetpStatementContext *ctx) override {
       statement = new StatementContext::SETP(); 
-      std::cout << "enter setpStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitSetpStatement(ptxParser::SetpStatementContext *ctx) override { 
       auto st = (StatementContext::SETP *)statement;
@@ -882,19 +1028,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->setpOp[i]);
       }
 
       /* end */
       statementType = S_SETP;
-      std::cout << "exit setpStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterCvtaStatement(ptxParser::CvtaStatementContext *ctx) override { 
       statement = new StatementContext::CVTA();
-      std::cout << "enter cvtaStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitCvtaStatement(ptxParser::CvtaStatementContext *ctx) override {
       auto st = (StatementContext::CVTA *)statement;
@@ -905,19 +1051,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1 */
+      /* op2 */
       for(int i=0;i<2;i++){
         fetchOperand(st->cvtaOp[i]);
       }
 
       /* end */
       statementType = S_CVTA;
-      std::cout << "exit cvtaStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterCvtStatement(ptxParser::CvtStatementContext *ctx) override {
       statement = new StatementContext::CVT(); 
-      std::cout << "enter cvtStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitCvtStatement(ptxParser::CvtStatementContext *ctx) override { 
       auto st = (StatementContext::CVT *)statement;
@@ -928,19 +1074,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1 */
+      /* op2 */
       for(int i=0;i<2;i++){
         fetchOperand(st->cvtOp[i]);
       }
 
       /* end */
       statementType = S_CVT;
-      std::cout << "exit cvtStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterMulStatement(ptxParser::MulStatementContext *ctx) override { 
       statement = new StatementContext::MUL();
-      std::cout << "enter mulStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitMulStatement(ptxParser::MulStatementContext *ctx) override { 
       auto st = (StatementContext::MUL *)statement;
@@ -951,19 +1097,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->mulOp[i]);
       }
 
       /* end */
       statementType = S_MUL;
-      std::cout << "exit mulStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterDivStatement(ptxParser::DivStatementContext *ctx) override { 
       statement = new StatementContext::DIV();
-      std::cout << "enter divStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitDivStatement(ptxParser::DivStatementContext *ctx) override { 
       auto st = (StatementContext::DIV *)statement;
@@ -974,19 +1120,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->divOp[i]);
       }
 
       /* end */
       statementType = S_DIV;
-      std::cout << "exit divStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterSubStatement(ptxParser::SubStatementContext *ctx) override { 
       statement = new StatementContext::SUB();
-      std::cout << "enter subStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitSubStatement(ptxParser::SubStatementContext *ctx) override { 
       auto st = (StatementContext::SUB *)statement;
@@ -997,19 +1143,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->subOp[i]);
       }
 
       /* end */
       statementType = S_SUB;
-      std::cout << "exit subStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterAddStatement(ptxParser::AddStatementContext *ctx) override { 
       statement = new StatementContext::ADD();
-      std::cout << "enter addStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitAddStatement(ptxParser::AddStatementContext *ctx) override { 
       auto st = (StatementContext::ADD *)statement;
@@ -1020,19 +1166,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->addOp[i]);
       }
 
       /* end */
       statementType = S_ADD;
-      std::cout << "exit addStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterShlStatement(ptxParser::ShlStatementContext *ctx) override { 
       statement = new StatementContext::SHL();
-      std::cout << "enter shlStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitShlStatement(ptxParser::ShlStatementContext *ctx) override { 
       auto st = (StatementContext::SHL *)statement;
@@ -1043,19 +1189,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->shlOp[i]);
       }
 
       /* end */
       statementType = S_SHL;
-      std::cout << "exit shlStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterShrStatement(ptxParser::ShrStatementContext *ctx) override { 
       statement = new StatementContext::SHR();
-      std::cout << "enter shrStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitShrStatement(ptxParser::ShrStatementContext *ctx) override { 
       auto st = (StatementContext::SHR *)statement;
@@ -1066,19 +1212,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->shrOp[i]);
       }
 
       /* end */
       statementType = S_SHR;
-      std::cout << "exit shrStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterMaxStatement(ptxParser::MaxStatementContext *ctx) override { 
       statement = new StatementContext::MAX();
-      std::cout << "enter maxStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitMaxStatement(ptxParser::MaxStatementContext *ctx) override { 
       auto st = (StatementContext::MAX *)statement;
@@ -1089,19 +1235,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->maxOp[i]);
       }
 
       /* end */
       statementType = S_MAX;
-      std::cout << "exit maxStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterMinStatement(ptxParser::MinStatementContext *ctx) override { 
       statement = new StatementContext::MIN();
-      std::cout << "enter minStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitMinStatement(ptxParser::MinStatementContext *ctx) override { 
       auto st = (StatementContext::MIN *)statement;
@@ -1112,19 +1258,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->minOp[i]);
       }
 
       /* end */
       statementType = S_MIN;
-      std::cout << "exit minStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterAndStatement(ptxParser::AndStatementContext *ctx) override { 
       statement = new StatementContext::AND();
-      std::cout << "enter andStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitAndStatement(ptxParser::AndStatementContext *ctx) override { 
       auto st = (StatementContext::AND *)statement;
@@ -1135,19 +1281,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->andOp[i]);
       }
 
       /* end */
       statementType = S_AND;
-      std::cout << "exit andStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterOrStatement(ptxParser::OrStatementContext *ctx) override { 
       statement = new StatementContext::OR();
-      std::cout << "enter orStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitOrStatement(ptxParser::OrStatementContext *ctx) override { 
       auto st = (StatementContext::OR *)statement;
@@ -1158,19 +1304,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2 */
+      /* op3 */
       for(int i=0;i<3;i++){
         fetchOperand(st->orOp[i]);
       }
 
       /* end */
       statementType = S_OR;
-      std::cout << "exit orStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterStStatement(ptxParser::StStatementContext *ctx) override { 
       statement = new StatementContext::ST();
-      std::cout << "enter stStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitStStatement(ptxParser::StStatementContext *ctx) override { 
       auto st = (StatementContext::ST *)statement;
@@ -1181,40 +1327,42 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1 */
+      /* op2 */
       for(int i=0;i<2;i++){
         fetchOperand(st->stOp[i]);
       }
 
       /* end */
       statementType = S_ST;
-      std::cout << "exit stStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterSelpStatement(ptxParser::SelpStatementContext *ctx) override { 
       statement = new StatementContext::SELP();
-      std::cout << "enter selpStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitSelpStatement(ptxParser::SelpStatementContext *ctx) override { 
       auto st = (StatementContext::SELP *)statement;
       
       /* qualifier */
-      st->selpQualifier = qualifier.front();
-      qualifier.pop();
+      while(qualifier.size()){
+        st->selpQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
       
-      /* op0,1,2,3 */
+      /* op4 */
       for(int i=0;i<4;i++){
         fetchOperand(st->selpOp[i]);
       }
       
       /* end */
       statementType = S_SELP;
-      std::cout << "exit selpStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterMadStatement(ptxParser::MadStatementContext *ctx) override { 
       statement = new StatementContext::MAD();
-      std::cout << "enter madStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitMadStatement(ptxParser::MadStatementContext *ctx) override { 
       auto st = (StatementContext::MAD *)statement;
@@ -1225,19 +1373,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2,3 */
+      /* op4 */
       for(int i=0;i<4;i++){
         fetchOperand(st->madOp[i]);
       }
 
       /* end */
       statementType = S_MAD;
-      std::cout << "exit madStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterFmaStatement(ptxParser::FmaStatementContext *ctx) override { 
       statement = new StatementContext::FMA();
-      std::cout << "enter fmaStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitFmaStatement(ptxParser::FmaStatementContext *ctx) override {
       auto st = (StatementContext::FMA *)statement; 
@@ -1248,19 +1396,19 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.pop();
       }
 
-      /* op0,1,2,3 */
+      /* op4 */
       for(int i=0;i<4;i++){
         fetchOperand(st->fmaOp[i]);
       }
 
       /* end */
       statementType = S_FMA;
-      std::cout << "exit fmaStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterWmmaStatement(ptxParser::WmmaStatementContext *ctx) override { 
       statement = new StatementContext::WMMA();
-      std::cout << "enter wmmaStatement" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitWmmaStatement(ptxParser::WmmaStatementContext *ctx) override {
       auto st = (StatementContext::WMMA *)statement;
@@ -1291,11 +1439,249 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end */
       statementType = S_WMMA; 
-      std::cout << "exit wmmaStatement" << std::endl;
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterNegStatement(ptxParser::NegStatementContext *ctx) override { 
+      statement = new StatementContext::NEG();
+      std::cout << __func__ << std::endl;
+    }
+    void exitNegStatement(ptxParser::NegStatementContext *ctx) override { 
+      auto st = (StatementContext::NEG *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->negQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op2 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->negOp[i]);
+      }
+
+      /* end */
+      statementType = S_NEG; 
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterNotStatement(ptxParser::NotStatementContext *ctx) override { 
+      statement = new StatementContext::NOT();
+      std::cout << __func__ << std::endl;
+    }
+    void exitNotStatement(ptxParser::NotStatementContext *ctx) override { 
+      auto st = (StatementContext::NOT *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->notQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op2 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->notOp[i]);
+      }
+
+      /* end */
+      statementType = S_NOT; 
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterSqrtStatement(ptxParser::SqrtStatementContext *ctx) override { 
+      statement = new StatementContext::SQRT();
+      std::cout << __func__ << std::endl;
+    }
+    void exitSqrtStatement(ptxParser::SqrtStatementContext *ctx) override { 
+      auto st = (StatementContext::SQRT *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->sqrtQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op2 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->sqrtOp[i]);
+      }
+
+      /* end */
+      statementType = S_SQRT; 
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterCosStatement(ptxParser::CosStatementContext *ctx) override { 
+      statement = new StatementContext::COS();
+      std::cout << __func__ << std::endl;
+    }
+    void exitCosStatement(ptxParser::CosStatementContext *ctx) override { 
+      auto st = (StatementContext::COS *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->cosQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op2 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->cosOp[i]);
+      }
+
+      /* end */
+      statementType = S_COS; 
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterLg2Statement(ptxParser::Lg2StatementContext *ctx) override { 
+      statement = new StatementContext::LG2();
+      std::cout << __func__ << std::endl;
+    }
+    void exitLg2Statement(ptxParser::Lg2StatementContext *ctx) override {
+      auto st = (StatementContext::LG2 *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->lg2Qualifier.push_back(qualifier.front());
+        qualifier.pop();
+      } 
+
+      /* op2 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->lg2Op[i]);
+      }
+
+      /* end */
+      statementType = S_LG2; 
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterEx2Statement(ptxParser::Ex2StatementContext *ctx) override { 
+      statement = new StatementContext::EX2();
+      std::cout << __func__ << std::endl;
+    }
+    void exitEx2Statement(ptxParser::Ex2StatementContext *ctx) override {
+      auto st = (StatementContext::EX2 *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->ex2Qualifier.push_back(qualifier.front());
+        qualifier.pop();
+      } 
+
+      /* op2 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->ex2Op[i]);
+      }
+
+      /* end */
+      statementType = S_EX2; 
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterAtomStatement(ptxParser::AtomStatementContext *ctx) override { 
+      statement = new StatementContext::ATOM();
+      std::cout << __func__ << std::endl;
+    }
+    void exitAtomStatement(ptxParser::AtomStatementContext *ctx) override { 
+      auto st = (StatementContext::ATOM *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->atomQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op3 or op4 */
+      if(ctx->operandFour()){
+        for(int i=0;i<4;i++){
+          fetchOperand(st->atomOp[i]);
+        }
+        st->operandNum = 4;
+      }else if(ctx->operandThree()){
+        for(int i=0;i<3;i++){
+          fetchOperand(st->atomOp[i]);
+        }
+        st->operandNum = 3;
+      }else assert(0);
+
+      /* end */
+      statementType = S_ATOM; 
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterXorStatement(ptxParser::XorStatementContext *ctx) override {
+      statement = new StatementContext::XOR(); 
+      std::cout << __func__ << std::endl;
+    }
+    void exitXorStatement(ptxParser::XorStatementContext *ctx) override { 
+      auto st = (StatementContext::XOR *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->xorQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op3 */
+      for(int i=0;i<3;i++){
+        fetchOperand(st->xorOp[i]);
+      }
+
+      /* end */
+      statementType = S_XOR; 
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterAbsStatement(ptxParser::AbsStatementContext *ctx) override { 
+      statement = new StatementContext::ABS();
+      std::cout << __func__ << std::endl;
+    }
+    void exitAbsStatement(ptxParser::AbsStatementContext *ctx) override { 
+      auto st = (StatementContext::ABS *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->absQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op2 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->absOp[i]);
+      }
+
+      /* end */
+      statementType = S_ABS; 
+      std::cout << __func__ << std::endl;
+    }
+
+    void enterSinStatement(ptxParser::SinStatementContext *ctx) override { 
+      statement = new StatementContext::SIN();
+      std::cout << __func__ << std::endl;
+    }
+    void exitSinStatement(ptxParser::SinStatementContext *ctx) override { 
+      auto st = (StatementContext::SIN *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->sinQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op2 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->sinOp[i]);
+      }
+
+      /* end */
+      statementType = S_SIN; 
+      std::cout << __func__ << std::endl;
     }
 
     void enterReg(ptxParser::RegContext *ctx) override { 
-      std::cout << "enter reg" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitReg(ptxParser::RegContext *ctx) override { 
       OperandContext *o = new OperandContext();
@@ -1305,12 +1691,11 @@ class PtxListener : public ptxParserBaseListener{
       o->operand = r;
       o->opType = O_REG;
       op.push(o); 
-      std::cout << "exit reg " << r->regMajorName << r->regIdx << ' '
-                << r->regMinorName << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterVector(ptxParser::VectorContext *ctx) override { 
-      std::cout << "enter vector" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitVector(ptxParser::VectorContext *ctx) override { 
       OperandContext *o = new OperandContext();
@@ -1328,11 +1713,11 @@ class PtxListener : public ptxParserBaseListener{
       o->operand = v;
       o->opType = O_VEC;
       op.push(o);
-      std::cout << "exit vector" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterFetchAddress(ptxParser::FetchAddressContext *ctx) override { 
-      std::cout << "enter fectchaddress" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitFetchAddress(ptxParser::FetchAddressContext *ctx) override { 
       OperandContext *o = new OperandContext();
@@ -1360,12 +1745,11 @@ class PtxListener : public ptxParserBaseListener{
       o->operand = fa;
       o->opType = O_FA;
       op.push(o);
-      std::cout << "exit fetchaddress " << fa->base << ' ' 
-                << fa->ifMinus << ' ' << fa->offset << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterImm(ptxParser::ImmContext *ctx) override { 
-      std::cout << "enter imm" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitImm(ptxParser::ImmContext *ctx) override { 
       OperandContext *o = new OperandContext();
@@ -1375,11 +1759,11 @@ class PtxListener : public ptxParserBaseListener{
       o->operand = imm;
       o->opType = O_IMM;
       op.push(o);
-      std::cout << "exit imm" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 
     void enterVar(ptxParser::VarContext *ctx) override { 
-      std::cout << "enter var" << std::endl;
+      std::cout << __func__ << std::endl;
     }
     void exitVar(ptxParser::VarContext *ctx) override { 
       OperandContext *o = new OperandContext();
@@ -1389,11 +1773,12 @@ class PtxListener : public ptxParserBaseListener{
       o->operand = var;
       o->opType = O_VAR;
       op.push(o);
-      std::cout << "exit var" << std::endl;
+      std::cout << __func__ << std::endl;
     }
 };
 
 int main(int argc, const char* argv[]) {
+  assert(argc>=2);
   std::ifstream stream;
   stream.open(argv[1]);
   ANTLRInputStream input(stream);
