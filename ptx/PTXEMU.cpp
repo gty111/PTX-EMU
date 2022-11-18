@@ -1,3 +1,8 @@
+/**
+ * @author gtyinstinct
+ * generate fake libcudart.so to replace origin libcudart.so
+*/
+
 #include<cstdio>
 #include<cassert>
 #include<driver_types.h>
@@ -13,7 +18,8 @@
 #include "ptxLexer.h"
 #include "ptxParser.h"
 #include "ptxParserBaseListener.h"
-#include "interface.h"
+#include "ptx-semantic.h"
+#include "ptx-interpreter.h"
 
 #define __my_func__ __func__
 
@@ -23,6 +29,9 @@ using namespace antlr4;
 std::string ptx_buffer;
 std::map<uint64_t,std::string>func2name;
 dim3 _gridDim,_blockDim;
+size_t _sharedMem;
+PtxListener ptxListener;
+PtxInterpreter ptxInterpreter;
 
 extern "C" {
 
@@ -45,7 +54,8 @@ void** __cudaRegisterFatBinary(
 
         // get ptx file name embedded in binary
         char cmd[1024] = "";
-        snprintf(cmd,1024,"cuobjdump -lptx %s | cut -d : -f 2 | awk '{$1=$1}1' > %s",self_exe_path,"__ptx_list__");
+        snprintf(cmd,1024,"cuobjdump -lptx %s | cut -d : -f 2 | awk '{$1=$1}1' > %s",
+            self_exe_path,"__ptx_list__");
         if(system(cmd)!=0){
             printf("EMU: fail to execute %s\n",cmd);
             exit(0);
@@ -56,7 +66,8 @@ void** __cudaRegisterFatBinary(
         std::string ptx_file;
         while(std::getline(infile,ptx_file)){
             printf("EMU: extract PTX file %s \n",ptx_file.c_str());
-            snprintf(cmd,1024,"cuobjdump -xptx %s %s >/dev/null",ptx_file.c_str(),self_exe_path);
+            snprintf(cmd,1024,"cuobjdump -xptx %s %s >/dev/null",ptx_file.c_str(),
+                self_exe_path);
             if(system(cmd)!=0){
                 printf("EMU: fail to execute %s\n",cmd);
                 exit(0);
@@ -79,10 +90,8 @@ void** __cudaRegisterFatBinary(
         CommonTokenStream tokens(&lexer);
         tokens.fill();
         ptxParser parser(&tokens);
-        PtxListener tl;
-        parser.addParseListener(&tl);
+        parser.addParseListener(&ptxListener);
         tree::ParseTree *tree = parser.ast();
-        test_semantic(tl);
     }
     return nullptr;
 }
@@ -131,6 +140,8 @@ cudaError_t cudaMemcpy(
     enum cudaMemcpyKind kind
 )
 {
+    printf("EMU: memcpy dst:%p src:%p\n",dst,src);
+    memcpy(dst,src,count);
     printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
@@ -157,7 +168,7 @@ unsigned __cudaPushCallConfiguration(
     dim3                gridDim,
     dim3                blockDim, 
     size_t              sharedMem = 0, 
-    struct CUstream_st *stream = 0
+    struct CUstream_st *stream = 0 // temporily ignore stream
 )
 {
     printf("EMU: call %s\n",__my_func__);
@@ -165,6 +176,7 @@ unsigned __cudaPushCallConfiguration(
     printf("EMU: blockDim(%d,%d,%d)\n",blockDim.x,blockDim.y,blockDim.z);
     _gridDim = gridDim;
     _blockDim = blockDim;
+    _sharedMem = sharedMem;
     return 0;
 }
 
@@ -209,6 +221,9 @@ cudaError_t __cudaPopCallConfiguration(
   void         *stream
 )
 {
+    *gridDim = _gridDim;
+    *blockDim = _blockDim;
+    *sharedMem = _sharedMem;
     printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
@@ -219,8 +234,14 @@ cudaError_t cudaLaunchKernel(
     dim3         blockDim, 
     void       **args, 
     size_t       sharedMem, 
-    cudaStream_t stream
-){
+    cudaStream_t stream     // temporily ignore stream
+)
+{
+    // ptxListener.test_semantic();
+
+    ptxInterpreter.launchPtxInterpreter(ptxListener.ptxContext,
+        func2name[(uint64_t)func],args,gridDim,blockDim);
+
     printf("EMU: call %s\n",__my_func__);
     //printf("%s\n",ptx_buffer.c_str());
     printf("EMU: deviceFunName %s\n",func2name[(uint64_t)func].c_str());
@@ -268,6 +289,7 @@ cudaError_t cudaMemset (
     size_t count 
 )
 {
+    memset(devPtr,value,count);
     printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }

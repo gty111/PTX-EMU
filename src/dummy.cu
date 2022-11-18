@@ -12,7 +12,7 @@ int main(){
 
     cudaMalloc(&a_d,SIZE*sizeof(int));
     
-    printf("arg ptr:%p\n",a_d);
+    printf("host ptr:%p device ptr:%p\n",a_h,a_d);
 
     dummy<<<1,SIZE>>>(a_d);
 
@@ -20,11 +20,12 @@ int main(){
 
     for(int i=0;i<SIZE;i++){
         if(a_h[i]!=i){
-            printf("check fail\n");
+            printf("at:%p expect:%d got:%d\n",&a_h[i],i,a_h[i]);
+            printf("FAIL\n");
             goto End;
         }
     }
-    printf("check pass\n");
+    printf("PASS\n");
 
     End:
     cudaFree(a_d);

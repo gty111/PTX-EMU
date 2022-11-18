@@ -1,4 +1,9 @@
-#include"interface.h"
+/**
+ * @author gtyinstinct
+ * test lexer parser semantic
+*/
+
+#include"ptx-semantic.h"
 
 // #define TOKEN
 // #define TREE
@@ -35,7 +40,7 @@ int main(int argc, const char* argv[]) {
 
  #ifdef SEMANTIC
   // output semantic
-  test_semantic(tl);
+  tl.test_semantic();
  #endif
 
   return 0;

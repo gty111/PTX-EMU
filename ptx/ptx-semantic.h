@@ -1,3 +1,10 @@
+/**
+ * @author gtyinstinct
+ * extract ptx semantic from grammar tree built by antlr4
+*/
+#ifndef __PTX_SEMANTIC__
+#define __PTX_SEMANTIC__
+
 #include <iostream>
 #include <vector>
 #include <cstdint>
@@ -175,14 +182,16 @@ class OperandContext {
     };
     class FA{ //fetch address
       public:
-        std::string base;
+        std::string ID;
+        OperandContext *reg;
         std::string offset;
         bool ifMinus;
 
         FA(){}
 
         FA(const FA &fa){
-          this->base = fa.base;
+          this->ID = fa.ID;
+          this->reg = fa.reg;
           this->offset  = fa.offset;
           this->ifMinus = fa.ifMinus;
         }
@@ -196,7 +205,7 @@ class StatementContext{
     class REG {
       public:
         std::vector<Qualifier> regDataType;
-        std::string regMajorName,regMinorName;
+        std::string regName;
         int regNum;
     };
     class SHARED {
@@ -444,6 +453,42 @@ class PtxListener : public ptxParserBaseListener{
     std::queue<OperandContext*> op;
 
     /* helper function */
+
+    void test_semantic(){
+      PtxContext &ptx = ptxContext;
+      std::printf(".version %d.%d\n",ptx.ptxMajorVersion,ptx.ptxMinorVersion);
+      std::printf(".target sm_%d\n",ptx.ptxTarget);
+      std::printf(".address_size %d\n",ptx.ptxAddressSize);
+      std::printf("number of kernel %d\n",ptx.ptxKernels.size());
+      for(int i=0;i<ptx.ptxKernels.size();i++){
+        KernelContext &kernel = ptx.ptxKernels[i];
+        if(kernel.ifEntryKernel){
+          std::printf(".entry ");
+        }
+        if(kernel.ifVisibleKernel){
+          std::printf(".visible ");
+        }
+        std::printf("%s\n",kernel.kernelName.c_str());
+        std::printf("number of param %d\n",kernel.kernelParams.size());
+        for(int i=0;i<kernel.kernelParams.size();i++){
+          ParamContext &param = kernel.kernelParams[i];
+          std::printf("%s: ",param.paramName.c_str());
+          if(param.paramAlign!=0){
+            std::printf("align %d ",param.paramAlign);
+          }
+          std::printf("%s ",Q2s(param.paramType).c_str());
+          if(param.paramNum!=0){
+            std::printf("arraySize %d ",param.paramNum);
+          }
+          std::printf("\n");
+        }
+        std::printf("number of statements %d\n",kernel.kernelStatements.size());
+        for(int i=0;i<kernel.kernelStatements.size();i++){
+          StatementContext stat = kernel.kernelStatements[i];
+          std::printf("%s %p\n",S2s(stat.statementType).c_str(),stat.statement);
+        }
+      }
+    }
 
     void extractREG(std::string s,int &idx,std::string &name){
       int ret = 0;
@@ -855,7 +900,7 @@ class PtxListener : public ptxParserBaseListener{
       if(ctx->LeftBracket()){
         paramContext->paramNum = stoi(ctx->DIGITS(digit_idx)->getText());
       }else{
-        paramContext->paramNum = 0;
+        paramContext->paramNum = 1;
       }
 
       /* qualifier */
@@ -926,13 +971,12 @@ class PtxListener : public ptxParserBaseListener{
       assert(op.size());
       assert(op.front()->opType==O_REG);
       auto reg = *(OperandContext::REG*)op.front()->operand;
-      st->regMajorName = reg.regMajorName;
-      st->regMinorName = reg.regMinorName;
+      st->regName = reg.regMajorName;
       op.pop();
 
       /* digits */
       if(ctx->DIGITS()){
-        st->regNum = stoi(ctx->DIGITS()->getText()) - 1;
+        st->regNum = stoi(ctx->DIGITS()->getText());
       }else{
         st->regNum = 1;
       }
@@ -2048,10 +2092,12 @@ class PtxListener : public ptxParserBaseListener{
 
       /* base */
       if(ctx->ID()){
-        fa->base = ctx->ID()->getText();
-      }else if(ctx->regi()){
+        fa->ID = ctx->ID()->getText();
+        fa->reg = nullptr;
+      }else if(ctx->reg()){
         // assume base not require regMinorName
-        fa->base = ctx->regi()->ID(0)->getText();
+        fa->reg = new OperandContext();
+        fetchOperand(*fa->reg);
       }else assert(0);
 
       /* minus */
@@ -2110,38 +2156,5 @@ class PtxListener : public ptxParserBaseListener{
     }
 };
 
-void test_semantic(PtxListener &tl){
-  PtxContext &ptx = tl.ptxContext;
-  std::printf(".version %d.%d\n",ptx.ptxMajorVersion,ptx.ptxMinorVersion);
-  std::printf(".target sm_%d\n",ptx.ptxTarget);
-  std::printf(".address_size %d\n",ptx.ptxAddressSize);
-  std::printf("number of kernel %d\n",ptx.ptxKernels.size());
-  for(int i=0;i<ptx.ptxKernels.size();i++){
-    KernelContext &kernel = ptx.ptxKernels[i];
-    if(kernel.ifEntryKernel){
-      std::printf(".entry ");
-    }
-    if(kernel.ifVisibleKernel){
-      std::printf(".visible ");
-    }
-    std::printf("%s\n",kernel.kernelName.c_str());
-    std::printf("number of param %d\n",kernel.kernelParams.size());
-    for(int i=0;i<kernel.kernelParams.size();i++){
-      ParamContext &param = kernel.kernelParams[i];
-      std::printf("%s: ",param.paramName.c_str());
-      if(param.paramAlign!=0){
-        std::printf("align %d ",param.paramAlign);
-      }
-      std::printf("%s ",tl.Q2s(param.paramType).c_str());
-      if(param.paramNum!=0){
-        std::printf("arraySize %d ",param.paramNum);
-      }
-      std::printf("\n");
-    }
-    std::printf("number of statements %d\n",kernel.kernelStatements.size());
-    for(int i=0;i<kernel.kernelStatements.size();i++){
-      StatementContext stat = kernel.kernelStatements[i];
-      std::printf("%s %p\n",tl.S2s(stat.statementType).c_str(),stat.statement);
-    }
-  }
-}
+
+#endif

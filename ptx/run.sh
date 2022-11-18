@@ -19,6 +19,6 @@ elif [ ${TARGET} == "cpp" ] ; then
     echo "build target for" ${TARGET}
     [ ! -d ${BIN_DIR} ] && mkdir ${BIN_DIR}
     antlr4 -Dlanguage=Cpp *.g4 -listener -visitor -package ptxparser -o ${BUILD_DIR}
-    cp test-interface.cpp interface.h ${BUILD_DIR}
+    cp test-ptx.cpp ptx-semantic.h ${BUILD_DIR}
     g++ ${CPPARG}
 fi

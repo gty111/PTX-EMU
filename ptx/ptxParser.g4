@@ -1,3 +1,8 @@
+/**
+ * @author gtyinstinct
+ * parser : define grammar rules for ptx
+*/
+
 parser grammar ptxParser;
 
 options {
@@ -206,4 +211,4 @@ vector : LeftBrace regi RightBrace
        | LeftBrace regi COMMA regi COMMA regi COMMA regi COMMA regi COMMA regi COMMA regi COMMA regi RightBrace
        ;
 
-fetchAddress : LeftBracket (ID|regi) PLUS? MINUS? DIGITS? RightBracket ;
+fetchAddress : LeftBracket (ID|reg) PLUS? MINUS? DIGITS? RightBracket ;

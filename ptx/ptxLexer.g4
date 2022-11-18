@@ -1,3 +1,8 @@
+/**
+ * @author gtyinstinct
+ * lexer : define tokens for ptx
+*/
+
 lexer grammar ptxLexer;
 
 /* ************ */
