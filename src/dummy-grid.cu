@@ -1,9 +1,13 @@
 #include<cstdio>
+#include<cassert> 
+
 #define SIZE 1024
+#define BLOCK_DIM 32
 
 template<typename T>
 __global__ void dummy_d(T *arr){
-    arr[threadIdx.x] = threadIdx.x;
+    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    arr[idx] = idx;
 }
 
 template<typename T>
@@ -17,7 +21,8 @@ bool dummy_h(){
     
     printf("host ptr:%p device ptr:%p\n",a_h,a_d);
 
-    dummy_d<T> <<<1,SIZE>>>(a_d);
+    assert(SIZE%BLOCK_DIM==0);
+    dummy_d<T> <<<SIZE/BLOCK_DIM,BLOCK_DIM>>>(a_d);
 
     cudaMemcpy(a_h,a_d,SIZE*sizeof(T),cudaMemcpyDeviceToHost);
 

@@ -2107,7 +2107,7 @@ class PtxListener : public ptxParserBaseListener{
       if(ctx->DIGITS()){
         fa->offset = ctx->DIGITS()->getText();
       }else{
-        fa->offset = "0";
+        fa->offset = "";
       }
       
       /* end */

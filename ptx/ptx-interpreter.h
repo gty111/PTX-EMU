@@ -1,7 +1,7 @@
 /**
  * @author gtyinstinct
  * ptx interpreter
- * TODO lots of BUG 
+ * lots of BUG 
 */
 
 #ifndef __PTX_INTERPRETER__
@@ -10,6 +10,26 @@
 #include<driver_types.h>
 
 #include "ptx-semantic.h"
+
+enum DTYPE{
+    DFLOAT,
+    DINT
+};
+
+class IMM{
+    public:
+    Qualifier type;
+    union Data{
+        uint8_t u8;
+        uint16_t u16;
+        uint32_t u32;
+        uint64_t u64;
+        float f32;
+        double f64;
+    };
+    Data data;
+};
+
 
 class PtxInterpreter{
   public:
@@ -41,6 +61,8 @@ class PtxInterpreter{
 
     std::map<std::string,PtxInterpreter::Symtable*>name2Sym;
     std::map<std::string,PtxInterpreter::Reg*>name2Reg;
+
+    IMM imm;
 
     void launchPtxInterpreter(PtxContext &ptx,std::string &kernel,void **args,
         dim3 &gridDim,dim3 &blockDim){
@@ -175,57 +197,27 @@ class PtxInterpreter{
                 // .param
 
                 // process op0
-                void *to;
-                if(ss->ldOp[0].opType==O_REG){
-                    to = getRegAddr((OperandContext::REG*)ss->ldOp[0].operand);
-                }else assert(0);
+                void *to = getOperandAddr(ss->ldOp[0],ss->ldQualifier);
 
                 // process op1
-                void *from;
-                if(ss->ldOp[1].opType==O_FA){
-                    auto fa = (OperandContext::FA*)ss->ldOp[1].operand;
-                    void *base;
-                    if(fa->reg){
-                        base = getRegAddr((OperandContext::REG*)fa->reg->operand);
-                    }else{
-                        base = (void*)name2Sym[fa->ID]->val;
-                    }
-                    if(fa->ifMinus){ // TODO parse offset
-                        from = (void*)(base + stoi(fa->offset,0,0));
-                    }else{
-                        from = (void*)(base - stoi(fa->offset,0,0));
-                    }
-                }else assert(0);
+                void *from = getOperandAddr(ss->ldOp[1],ss->ldQualifier);
 
                 // exe ld
-                mov(from,to,getBits(ss->ldQualifier));
-            }
+                mov(from,to,ss->ldQualifier);
+            }else assert(0);
             return;
         }
         case S_MOV:{
             auto ss = (StatementContext::MOV*)s.statement;
             
             // op0
-            void *to;
-            if(ss->movOp[0].opType==O_REG){
-                to = getRegAddr((OperandContext::REG*)ss->movOp[0].operand);
-            }else assert(0);
+            void *to = getOperandAddr(ss->movOp[0],ss->movQualifier);
 
             // op1
-            void *from;
-            if(ss->movOp[1].opType==O_REG){
-                auto op1 = (OperandContext::REG*)ss->movOp[1].operand;
-                if(op1->regMinorName.size()==1){
-                    static uint64_t t;
-                    t = getInternReg(op1);
-                    from = &t;
-                }else{
-                    from = getRegAddr(op1);
-                }
-            }else assert(0);
+            void *from = getOperandAddr(ss->movOp[1],ss->movQualifier);
 
             // exe mov
-            mov(from,to,getBits(ss->movQualifier));
+            mov(from,to,ss->movQualifier);
             return;
         }
         case S_SETP:{
@@ -236,19 +228,13 @@ class PtxInterpreter{
             auto ss = (StatementContext::CVTA*)s.statement;
 
             // op0 
-            void *to;
-            if(ss->cvtaOp[0].opType==O_REG){
-                to = getRegAddr((OperandContext::REG*)ss->cvtaOp[0].operand);
-            }else assert(0);
+            void *to = getOperandAddr(ss->cvtaOp[0],ss->cvtaQualifier);
 
             // op1
-            void *from;
-            if(ss->cvtaOp[1].opType==O_REG){
-                from = getRegAddr((OperandContext::REG*)ss->cvtaOp[1].operand);
-            }
+            void *from = getOperandAddr(ss->cvtaOp[1],ss->cvtaQualifier);
 
             // exe cvta just mov
-            mov(from,to,getBits(ss->cvtaQualifier));
+            mov(from,to,ss->cvtaQualifier);
 
             return;
         }
@@ -260,28 +246,16 @@ class PtxInterpreter{
             auto ss = (StatementContext::MUL*)s.statement;
 
             // op0
-            void *to;
-            if(ss->mulOp[0].opType==O_REG){
-                to = getRegAddr((OperandContext::REG*)ss->mulOp[0].operand);
-            }else assert(0);
+            void *to = getOperandAddr(ss->mulOp[0],ss->mulQualifier);
 
             // op1
-            void *op1;
-            if(ss->mulOp[1].opType==O_REG){
-                op1 = getRegAddr((OperandContext::REG*)ss->mulOp[1].operand);
-            }else assert(0);
+            void *op1 = getOperandAddr(ss->mulOp[1],ss->mulQualifier);
 
             // op2
-            void *op2;
-            if(ss->mulOp[2].opType==O_IMM){
-                static uint64_t t;
-                auto imm = (OperandContext::IMM*)ss->mulOp[2].operand;
-                t = stoi(imm->immVal,0,0); // TODO parse imm
-                op2 = &t;
-            }else assert(0);
+            void *op2 = getOperandAddr(ss->mulOp[2],ss->mulQualifier);
 
             // exe mul
-            mul(to,op1,op2,getBits(ss->mulQualifier));
+            mul(to,op1,op2,ss->mulQualifier);
 
             return;
         }
@@ -297,25 +271,16 @@ class PtxInterpreter{
             auto ss = (StatementContext::ADD*)s.statement;
 
             // op0
-            void *to;
-            if(ss->addOp[0].opType==O_REG){
-                to = getRegAddr((OperandContext::REG*)ss->addOp[0].operand);
-            }else assert(0);
+            void *to = getOperandAddr(ss->addOp[0],ss->addQualifier);
 
             // op1
-            void *op1;
-            if(ss->addOp[1].opType==O_REG){
-                op1 = getRegAddr((OperandContext::REG*)ss->addOp[1].operand);
-            }else assert(0);
+            void *op1 = getOperandAddr(ss->addOp[1],ss->addQualifier);
             
             // op2 
-            void *op2;
-            if(ss->addOp[2].opType==O_REG){
-                op2 = getRegAddr((OperandContext::REG*)ss->addOp[2].operand);
-            }else assert(0);
+            void *op2 = getOperandAddr(ss->addOp[2],ss->addQualifier);
 
             // exe add
-            add(to,op1,op2,getBits(ss->addQualifier));
+            add(to,op1,op2,ss->addQualifier);
 
             return;
         }
@@ -347,30 +312,14 @@ class PtxInterpreter{
             auto ss = (StatementContext::ST*)s.statement;
 
             // op0
-            void *to;
-            assert(ss->stOp[0].opType==O_FA);
-            auto fa = (OperandContext::FA*)ss->stOp[0].operand;
-            void *base;
-            if(fa->reg){
-                base = getRegAddr((OperandContext::REG*)fa->reg->operand);
-            }else{
-                base = (void*)name2Sym[fa->ID]->val;
-            }
-            if(fa->ifMinus){
-                to = base - stoi(fa->offset,0,0);
-            }else{
-                to = base + stoi(fa->offset,0,0);
-            }
-            to = (void*)*(uint64_t*)to; 
+            void *to = getOperandAddr(ss->stOp[0],ss->stQualifier);
+            to = (void*)*(uint64_t*)to;
 
             // op1
-            void *from;
-            if(ss->stOp[1].opType==O_REG){
-                from = getRegAddr((OperandContext::REG*)ss->stOp[1].operand);
-            }else assert(0);
+            void *from = getOperandAddr(ss->stOp[1],ss->stQualifier);
 
             // exe st
-            mov(from,to,getBits(ss->stQualifier));
+            mov(from,to,ss->stQualifier);
 
             return;
         }
@@ -379,7 +328,28 @@ class PtxInterpreter{
             return;
         }
         case S_MAD:{
-            assert(0);
+            auto ss = (StatementContext::MAD*)s.statement;
+
+            // op0 
+            void *to = getOperandAddr(ss->madOp[0],ss->madQualifier);
+            
+            // op1
+            void *op0 = getOperandAddr(ss->madOp[1],ss->madQualifier);
+
+            // op2 
+            void *op1 = getOperandAddr(ss->madOp[2],ss->madQualifier);
+
+            // op3
+            void *op2 = getOperandAddr(ss->madOp[3],ss->madQualifier);
+
+            // exe mad
+            void *t = malloc(8);
+
+            mul(t,op0,op1,ss->madQualifier);
+
+            add(to,t,op2,ss->madQualifier);
+
+            free(t);
             return;
         }
         case S_FMA:{
@@ -434,6 +404,37 @@ class PtxInterpreter{
         }
     }
 
+    // helper function
+
+    void setIMM(std::string s,Qualifier q){
+        this->imm.type = q;
+        switch(q){
+        case Q_S64:case Q_U64:case Q_B64:
+        this->imm.data.u64 = stol(s,0,0);
+        return;
+        case Q_S32:case Q_U32:case Q_B32:
+        this->imm.data.u32 = stoi(s,0,0);
+        return;
+        case Q_S16:case Q_U16:case Q_B16:
+        this->imm.data.u16 = stoi(s,0,0);
+        return;
+        case Q_S8:case Q_U8:case Q_B8:
+        this->imm.data.u8 = stoi(s,0,0);
+        return;
+        case Q_F64:
+        assert(s.size()==18&&(s[1]=='d'||s[1]=='D'));
+        s[1] = 'x';
+        *(uint64_t*)&(this->imm.data.f64) = stoull(s,0,0);
+        return;
+        case Q_F32:
+        assert(s.size()==10&&(s[1]=='f'||s[1]=='F'));
+        s[1] = 'x';
+        *(uint32_t*)&(this->imm.data.f32) = stoi(s,0,0);
+        return;
+        default:assert(0);
+        }
+    }
+
     int Q2bits(Qualifier &q){
         switch(q){
         case Q_S64:case Q_F64:case Q_B64:case Q_U64:return 8;
@@ -452,6 +453,26 @@ class PtxInterpreter{
         return false;
     }
 
+    Qualifier getDataType(std::vector<Qualifier>&q){
+        for(auto e:q){
+            if(Q2bits(e))return e;
+        }
+        assert(0);
+    }
+
+    DTYPE getDType(std::vector<Qualifier>&q){
+        for(auto e:q){
+            switch(e){
+            case Q_F64:case Q_F32:case Q_F16:case Q_F8: return DFLOAT;
+            case Q_S64:case Q_B64:case Q_U64:
+            case Q_S32:case Q_B32:case Q_U32:
+            case Q_S16:case Q_B16:case Q_U16:
+            case Q_S8:case Q_B8:case Q_U8:return DINT;
+            }
+        }
+        assert(0);
+    }
+
     int getBits(std::vector<Qualifier>&q){
         int ret;
         for(auto e:q){
@@ -460,15 +481,54 @@ class PtxInterpreter{
         return 0;
     }
 
-    void *getRegAddr(OperandContext::REG *regContext){
-        std::printf("INTE: access %s%d\n",
-            regContext->regMajorName.c_str(),regContext->regIdx);
-        auto reg = name2Reg[regContext->regMajorName];
-        uint64_t offset = (regContext->regIdx-1) * reg->byteNum;
-        return (void *)((uint64_t)reg->addr + offset);
+    void *getOperandAddr(OperandContext &op,std::vector<Qualifier>&q){
+        if(op.opType==O_REG){
+            return getRegAddr((OperandContext::REG*)op.operand);
+        }else if(op.opType==O_FA){
+            return getFaAddr((OperandContext::FA*)op.operand);
+        }else if(op.opType==O_IMM){
+            setIMM(((OperandContext::IMM*)op.operand)->immVal,
+                    getDataType(q));
+            return &(this->imm.data);
+        }else assert(0);
     }
 
-    uint64_t getInternReg(OperandContext::REG *regContext){
+    void *getRegAddr(OperandContext::REG *regContext){
+        if(regContext->regMinorName.size()==1){
+            std::printf("INTE: access %s.%s\n",
+                regContext->regMajorName.c_str(),regContext->regMinorName.c_str());
+            static uint64_t t;
+            t = getSpReg(regContext);
+            return &t;
+        }else{
+            std::printf("INTE: access %s%d\n",
+                regContext->regMajorName.c_str(),regContext->regIdx);
+            auto reg = name2Reg[regContext->regMajorName];
+            uint64_t offset = (regContext->regIdx-1) * reg->byteNum;
+            return (void *)((uint64_t)reg->addr + offset);
+        }
+    }
+
+    void *getFaAddr(OperandContext::FA *fa){
+        void *ret;
+        if(fa->reg){
+            ret = getRegAddr((OperandContext::REG*)fa->reg->operand);
+        }else{
+            ret = (void*)name2Sym[fa->ID]->val;
+        }
+        if(fa->offset.size()!=0){
+            setIMM(fa->offset,Q_U64);
+            if(fa->ifMinus){ 
+                ret = (void*)((uint64_t)ret + this->imm.data.u64);
+            }else{
+                ret = (void*)((uint64_t)ret - this->imm.data.u64);
+            }
+        }
+        printf("INTE: FA %p\n",ret);
+        return ret;
+    }
+
+    uint64_t getSpReg(OperandContext::REG *regContext){
         if(regContext->regMajorName=="tid"){
             if(regContext->regMinorName=="x"){
                 return curBlockIdx.x;
@@ -477,54 +537,101 @@ class PtxInterpreter{
             }else if(regContext->regMinorName=="z"){
                 return curBlockIdx.z;
             }else assert(0);
+        }else if(regContext->regMajorName=="ctaid"){
+            if(regContext->regMinorName=="x"){
+                return curGridIdx.x;
+            }else if(regContext->regMinorName=="y"){
+                return curGridIdx.y;
+            }else if(regContext->regMinorName=="z"){
+                return curGridIdx.z;
+            }else assert(0);
+        }else if(regContext->regMajorName=="ntid"){
+            if(regContext->regMinorName=="x"){
+                return blockDim.x;
+            }else if(regContext->regMinorName=="y"){
+                return blockDim.y;
+            }else if(regContext->regMinorName=="z"){
+                return blockDim.z;
+            }else assert(0);
+        }else if(regContext->regMajorName=="nctaid"){
+            if(regContext->regMinorName=="x"){
+                return gridDim.x;
+            }else if(regContext->regMinorName=="y"){
+                return gridDim.y;
+            }else if(regContext->regMinorName=="z"){
+                return gridDim.z;
+            }else assert(0);
         }else assert(0);
     }
 
-    // TODO float or double mul
-    void add(void *to,void *op1,void *op2,int len){
+    template<typename T>
+    void _add(void *to,void *op1,void *op2){
+        *(T*)to = *(T*)op1 + *(T*)op2;
+    }
+
+    void add(void *to,void *op1,void *op2,std::vector<Qualifier>&q){
+        printf("INTE: add dest:%p op1:%p op2:%p\n",to,op1,op2);
+        int len = getBits(q);
+        DTYPE dtype = getDType(q);
         switch(len){
         case 1:
-        *(uint8_t*)to = *(uint8_t*)op1 + *(uint8_t*)op2;
-        printf("INTE: add dest:%p op1:%d op2:%d\n",to,*(uint8_t*)op1,*(uint8_t*)op2);
+        _add<uint8_t>(to,op1,op2);
         return;
         case 2:
-        *(uint16_t*)to = *(uint16_t*)op1 + *(uint16_t*)op2;
-        printf("INTE: add dest:%p op1:%d op2:%d\n",to,*(uint16_t*)op1,*(uint16_t*)op2);
+        _add<uint16_t>(to,op1,op2);
         return;
         case 4:
-        *(uint32_t*)to = *(uint32_t*)op1 + *(uint32_t*)op2;
-        printf("INTE: add dest:%p op1:%d op2:%d\n",to,*(uint32_t*)op1,*(uint32_t*)op2);
+        switch(dtype){
+            case DINT: _add<uint32_t>(to,op1,op2);return;
+            case DFLOAT: _add<float>(to,op1,op2);return;
+            default: assert(0);
+        }
         return;
         case 8:
-        *(uint64_t*)to = *(uint64_t*)op1 + *(uint64_t*)op2;
-        printf("INTE: add dest:%p op1:0x%lx op2:0x%lx\n",to,*(uint64_t*)op1,*(uint64_t*)op2);
-        return;
+        switch(dtype){
+            case DINT: _add<uint64_t>(to,op1,op2);return;
+            case DFLOAT: _add<double>(to,op1,op2);return;
+            default: assert(0);
+        }
+        default: assert(0);
         }
     }
 
-    // TODO float or double mul
-    void mul(void *to,void *op1,void *op2,int len){
+    template<typename T>
+    void _mul(void *to,void *op1,void *op2){
+        *(T*)to = *(T*)op1 * *(T*)op2;
+    }
+
+    // TODO .wide .lo .hi
+    void mul(void *to,void *op1,void *op2,std::vector<Qualifier>&q){
+        printf("INTE: mul dest:%p op1:%p op2:%p\n",to,op1,op2);
+        int len = getBits(q);
+        DTYPE dtype = getDType(q);
         switch(len){
         case 1:
-        *(uint8_t*)to = *(uint8_t*)op1 * *(uint8_t*)op2;
-        printf("INTE: mul dest:%p op1:%d op2:%d\n",to,*(uint8_t*)op1,*(uint8_t*)op2);
+        _mul<uint8_t>(to,op1,op2);
         return;
         case 2:
-        *(uint16_t*)to = *(uint16_t*)op1 * *(uint16_t*)op2;
-        printf("INTE: mul dest:%p op1:%d op2:%d\n",to,*(uint16_t*)op1,*(uint16_t*)op2);
+        _mul<uint16_t>(to,op1,op2);
         return;
         case 4:
-        *(uint32_t*)to = *(uint32_t*)op1 * *(uint32_t*)op2;
-        printf("INTE: mul dest:%p op1:%d op2:%d\n",to,*(uint32_t*)op1,*(uint32_t*)op2);
-        return;
+        switch(dtype){
+            case DINT: _mul<uint32_t>(to,op1,op2);return;
+            case DFLOAT: _mul<float>(to,op1,op2);return;
+            default: assert(0);
+        }
         case 8:
-        *(uint64_t*)to = *(uint64_t*)op1 * *(uint64_t*)op2;
-        printf("INTE: mul dest:%p op1:%d op2:%d\n",to,*(uint64_t*)op1,*(uint64_t*)op2);
-        return;
+        switch(dtype){
+            case DINT: _mul<uint64_t>(to,op1,op2);return;
+            case DFLOAT: _mul<double>(to,op1,op2);return;
+            default: assert(0);
+        }
+        default:assert(0);
         }
     }
 
-    void mov(void *from,void *to,int len){
+    void mov(void *from,void *to,std::vector<Qualifier>&q){
+        int len = getBits(q);
         switch(len){
         case 1:
         *(uint8_t*)to = *(uint8_t*)from;

@@ -17,6 +17,8 @@ all:$(TARGETCU)
 $(TARGETCU):%:src/%.cu
 	$(shell [ ! -d bin ] && mkdir bin)
 	nvcc $(NVCC_FLARG) $^ -o bin/$@
+	cuobjdump -xptx $@.1.$(ARCH).ptx bin/$@
+	mv $@.1.$(ARCH).ptx src/$@.ptx
 
 lib: 
 	$(shell [ ! -d lib ] && mkdir lib)

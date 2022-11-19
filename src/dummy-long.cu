@@ -39,5 +39,5 @@ bool dummy_h(){
 }
 
 int main(){
-    return dummy_h<int>();
+    return dummy_h<long long>();
 }   
