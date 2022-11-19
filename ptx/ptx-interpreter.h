@@ -98,7 +98,7 @@ class PtxInterpreter{
             s->name = e.paramName;
             s->elementNum = e.paramNum;
             s->symType = e.paramType;
-            s->byteNum = Q2bits(e.paramType);
+            s->byteNum = Q2bytes(e.paramType);
             s->val = (uint64_t)kernelArgs[i];
             name2Sym[s->name] = s;
         }
@@ -110,7 +110,22 @@ class PtxInterpreter{
                 curGridIdx.x,curGridIdx.y,curGridIdx.z,
                 curBlockIdx.x,curBlockIdx.y,curBlockIdx.z);
             for(auto &e:kernelContext->kernelStatements){
+                #ifdef DEBUG
+                getchar();
+                #endif
                 exe_once(e);
+                #ifdef DEBUG
+                for(auto &e:name2Reg){
+                    auto ee = e.second;
+                    void *base = ee->addr;
+                    for(int i=0;i<ee->elementNum;i++){
+                        switch(ee->byteNum){
+                        case 4:std::printf("%s%d:%lx\n",ee->name.c_str(),i,*(uint32_t*)(base+i*ee->byteNum));break;
+                        case 8:std::printf("%s%d:%lx\n",ee->name.c_str(),i,*(uint64_t*)(base+i*ee->byteNum));break;
+                        }
+                    }
+                }
+                #endif
             }
             curBlockIdx.x ++;
             if(curBlockIdx.x==blockDim.x){
@@ -149,9 +164,9 @@ class PtxInterpreter{
             reg->regType = ss->regDataType.back();
             reg->name = ss->regName;
             reg->elementNum = ss->regNum;
-            reg->byteNum = Q2bits(ss->regDataType.back());
+            reg->byteNum = Q2bytes(ss->regDataType.back());
             assert(reg->byteNum);
-            reg->addr = calloc(reg->elementNum,reg->byteNum/8);
+            reg->addr = calloc(reg->elementNum,reg->byteNum);
             name2Reg[reg->name] = reg;
             return;
         }
@@ -239,7 +254,15 @@ class PtxInterpreter{
             return;
         }
         case S_CVT:{
-            assert(0);
+            auto ss = (StatementContext::CVT*)s.statement;
+
+            // op0
+            void *to = getOperandAddr(ss->cvtOp[0],ss->cvtQualifier);
+
+            // op1
+            void *from = getOperandAddr(ss->cvtOp[1],ss->cvtQualifier);
+
+            cvt(to,from,ss->cvtQualifier);
             return;
         }
         case S_MUL:{
@@ -285,7 +308,20 @@ class PtxInterpreter{
             return;
         }
         case S_SHL:{
-            assert(0);
+            auto ss = (StatementContext::SHL*)s.statement;
+
+            // op0
+            void *to = getOperandAddr(ss->shlOp[0],ss->shlQualifier);
+
+            // op1
+            void *op0 = getOperandAddr(ss->shlOp[1],ss->shlQualifier);
+
+            // op2
+            void *op1 = getOperandAddr(ss->shlOp[2],ss->shlQualifier);
+
+            // exe shl
+            shl(to,op0,op1,ss->shlQualifier);
+
             return;
         }
         case S_SHR:{
@@ -435,7 +471,7 @@ class PtxInterpreter{
         }
     }
 
-    int Q2bits(Qualifier &q){
+    int Q2bytes(Qualifier &q){
         switch(q){
         case Q_S64:case Q_F64:case Q_B64:case Q_U64:return 8;
         case Q_S32:case Q_F32:case Q_B32:case Q_U32:return 4;
@@ -455,7 +491,7 @@ class PtxInterpreter{
 
     Qualifier getDataType(std::vector<Qualifier>&q){
         for(auto e:q){
-            if(Q2bits(e))return e;
+            if(Q2bytes(e))return e;
         }
         assert(0);
     }
@@ -476,9 +512,15 @@ class PtxInterpreter{
     int getBits(std::vector<Qualifier>&q){
         int ret;
         for(auto e:q){
-            if(ret=Q2bits(e))return ret;
+            if(ret=Q2bytes(e))return ret;
         }
         return 0;
+    }
+
+    int getBits(Qualifier q){
+        std::vector<Qualifier>t;
+        t.push_back(q);
+        return getBits(t);
     }
 
     void *getOperandAddr(OperandContext &op,std::vector<Qualifier>&q){
@@ -504,7 +546,7 @@ class PtxInterpreter{
             std::printf("INTE: access %s%d\n",
                 regContext->regMajorName.c_str(),regContext->regIdx);
             auto reg = name2Reg[regContext->regMajorName];
-            uint64_t offset = (regContext->regIdx-1) * reg->byteNum;
+            uint64_t offset = regContext->regIdx * reg->byteNum;
             return (void *)((uint64_t)reg->addr + offset);
         }
     }
@@ -526,6 +568,15 @@ class PtxInterpreter{
         }
         printf("INTE: FA %p\n",ret);
         return ret;
+    }
+
+    Qualifier getMulQ(std::vector<Qualifier>&q){
+        for(auto e:q){
+            if(e==Q_WIDE||e==Q_HI||e==Q_LO){
+                return e;
+            }
+        }
+        assert(0);
     }
 
     uint64_t getSpReg(OperandContext::REG *regContext){
@@ -565,6 +616,70 @@ class PtxInterpreter{
     }
 
     template<typename T>
+    void _shl(void *to,void *op0,void *op1){
+        *(T*)to = *(T*)op0 << *(uint32_t*)op1 ;
+    }
+
+    void shl(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
+        int len = getBits(q);
+        switch(len){
+        case 1: _shl<uint8_t>(to,op0,op1);return;
+        case 2: _shl<uint16_t>(to,op0,op1);return;
+        case 4: _shl<uint32_t>(to,op0,op1);return;
+        case 8: _shl<uint64_t>(to,op0,op1);return;
+        default: assert(0);
+        }
+    }
+
+    template<typename T1,typename T2>
+    void __cvt(void *to,void *from){
+        *(T1*)to = *(T2*)from;
+    }
+
+    template<typename T>
+    void _cvt(void *to,void *from,int bitnum){
+        switch(bitnum){
+        case 8: 
+        __cvt<T,uint64_t>(to,from);
+        return;
+        case 4: 
+        __cvt<T,uint32_t>(to,from);
+        return;
+        case 2:
+        __cvt<T,uint16_t>(to,from);
+        return;
+        case 1:
+        __cvt<T,uint8_t>(to,from);
+        return;
+        default: assert(0);
+        }
+    }
+
+    void cvt(void *to,void *from,std::vector<Qualifier>&q){
+        int bitnum[2],idx=0;
+        for(auto e:q){
+            if(getBits(e))bitnum[idx++] = getBits(e);
+            if(idx==2)break;
+        }
+        assert(idx==2);
+        switch(bitnum[0]){
+            case 8: 
+            _cvt<uint64_t>(to,from,bitnum[1]);
+            return;
+            case 4: 
+            _cvt<uint32_t>(to,from,bitnum[1]);
+            return;
+            case 2:
+            _cvt<uint16_t>(to,from,bitnum[1]);
+            return;
+            case 1:
+            _cvt<uint8_t>(to,from,bitnum[1]);
+            return;
+            default: assert(0);
+        }
+    }
+
+    template<typename T>
     void _add(void *to,void *op1,void *op2){
         *(T*)to = *(T*)op1 + *(T*)op2;
     }
@@ -597,57 +712,98 @@ class PtxInterpreter{
         }
     }
 
+    template<typename TOUT,typename TIN>
+    void _mulIntWide(void *to,void *op1,void *op2){
+        __uint128_t t1,t2;
+        t1 = *(TIN*)op1;
+        t2 = *(TIN*)op2;
+        *(TOUT*)to = (TOUT)(t1 * t2);
+    }
+
     template<typename T>
-    void _mul(void *to,void *op1,void *op2){
+    void _mulIntHI(void *to,void *op1,void *op2){
+        __uint128_t t1,t2;
+        t1 = *(T*)op1;
+        t2 = *(T*)op2;
+        *(T*)to = (T)((t1*t2) >> sizeof(T));
+    }
+
+    template<typename T>
+    void _mulIntLO(void *to,void *op1,void *op2){
         *(T*)to = *(T*)op1 * *(T*)op2;
     }
 
-    // TODO .wide .lo .hi
+    template<typename T>
+    void _mulfloat(void *to,void *op1,void *op2){
+        *(T*)to = *(T*)op1 * *(T*)op2;
+    }
+
     void mul(void *to,void *op1,void *op2,std::vector<Qualifier>&q){
         printf("INTE: mul dest:%p op1:%p op2:%p\n",to,op1,op2);
         int len = getBits(q);
         DTYPE dtype = getDType(q);
+        Qualifier mulType = getMulQ(q);
         switch(len){
         case 1:
-        _mul<uint8_t>(to,op1,op2);
+        switch(mulType){
+            case Q_WIDE:_mulIntWide<uint16_t,uint8_t>(to,op1,op2);return;
+            case Q_HI:_mulIntHI<uint8_t>(to,op1,op2);return;
+            case Q_LO:_mulIntLO<uint8_t>(to,op1,op2);return;
+        }
         return;
         case 2:
-        _mul<uint16_t>(to,op1,op2);
+        switch(mulType){
+            case Q_WIDE:_mulIntWide<uint32_t,uint16_t>(to,op1,op2);return;
+            case Q_HI:_mulIntHI<uint16_t>(to,op1,op2);return;
+            case Q_LO:_mulIntLO<uint16_t>(to,op1,op2);return;
+        }
         return;
         case 4:
         switch(dtype){
-            case DINT: _mul<uint32_t>(to,op1,op2);return;
-            case DFLOAT: _mul<float>(to,op1,op2);return;
+            case DINT: 
+            switch(mulType){
+                case Q_WIDE:_mulIntWide<uint64_t,uint32_t>(to,op1,op2);return;
+                case Q_HI:_mulIntHI<uint32_t>(to,op1,op2);return;
+                case Q_LO:_mulIntLO<uint32_t>(to,op1,op2);return;
+            }
+            case DFLOAT: _mulfloat<float>(to,op1,op2);return;
             default: assert(0);
         }
         case 8:
         switch(dtype){
-            case DINT: _mul<uint64_t>(to,op1,op2);return;
-            case DFLOAT: _mul<double>(to,op1,op2);return;
+            case DINT: 
+            switch(mulType){
+                case Q_WIDE:_mulIntWide<__uint128_t,uint64_t>(to,op1,op2);return;
+                case Q_HI:_mulIntHI<uint64_t>(to,op1,op2);return;
+                case Q_LO:_mulIntLO<uint64_t>(to,op1,op2);return;
+            }
+            case DFLOAT: _mulfloat<double>(to,op1,op2);return;
             default: assert(0);
         }
         default:assert(0);
         }
     }
 
+    template<typename T>
+    void _mov(void *from,void *to){
+        *(T*)to = *(T*)from;
+        std::printf("INTE: mov %p to %p data:%lx\n",from,to,*(T*)from);
+    }
+
     void mov(void *from,void *to,std::vector<Qualifier>&q){
         int len = getBits(q);
         switch(len){
         case 1:
-        *(uint8_t*)to = *(uint8_t*)from;
-        std::printf("INTE: mov %p to %p data:%x\n",from,to,*(uint8_t*)from);
+        _mov<uint8_t>(from,to);
         return;
         case 2:
-        *(uint16_t*)to = *(uint16_t*)from;
-        std::printf("INTE: mov %p to %p data:%x\n",from,to,*(uint16_t*)from);
+        _mov<uint16_t>(from,to);
         return;
         case 4:
-        *(uint32_t*)to = *(uint32_t*)from;
-        std::printf("INTE: mov %p to %p data:%x\n",from,to,*(uint32_t*)from);
+        _mov<uint32_t>(from,to);
         return;
         case 8:
-        *(uint64_t*)to = *(uint64_t*)from;
-        std::printf("INTE: mov %p to %p data:%lx\n",from,to,*(uint64_t*)from);
+        _mov<uint64_t>(from,to);
         return;
         default:assert(0);
         }

@@ -62,6 +62,7 @@ qualifier : U64
           | WIDE
           | SYNC
           | LO
+          | HI
           | UNI 
           | RN
           | A

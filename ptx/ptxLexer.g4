@@ -47,6 +47,8 @@ SYNC: '.sync' ;
 
 LO: '.lo' ;
 
+HI: '.hi';
+
 GE: '.ge' ;
 
 GEU: '.geu' ;

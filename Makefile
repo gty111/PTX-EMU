@@ -24,5 +24,10 @@ lib:
 	$(shell [ ! -d lib ] && mkdir lib)
 	make -C ptx
 	g++ $(CPP_FLAG) ptx/PTXEMU.cpp ptx/build/*.cpp $(addprefix -I,$(INCLUDE_DIR)) $(addprefix -L,$(LINKPATH)) -lantlr4-runtime -o lib/$(LIB_OUT)
+Dlib:
+	$(shell [ ! -d lib ] && mkdir lib)
+	make -C ptx
+	g++ -D DEBUG $(CPP_FLAG) ptx/PTXEMU.cpp ptx/build/*.cpp $(addprefix -I,$(INCLUDE_DIR)) $(addprefix -L,$(LINKPATH)) -lantlr4-runtime -o lib/$(LIB_OUT)
+
 # export LD_LIBRARY_PATH=~/SIM_ON_GPU/lib:$LD_LIBRARY_PATH
 .PHONY: lib link bin run ncu cuobjdump test setenv

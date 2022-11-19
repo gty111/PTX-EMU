@@ -52,6 +52,7 @@ enum Qualifier{
   Q_WIDE,
   Q_SYNC,
   Q_LO,
+  Q_HI,
   Q_UNI,
   Q_RN,
   Q_A,
@@ -548,6 +549,7 @@ class PtxListener : public ptxParserBaseListener{
       case Q_WIDE:return ".wide";
       case Q_SYNC:return ".sync";
       case Q_LO:return ".lo";
+      case Q_HI:return ".hi";
       case Q_UNI:return ".uni";
       case Q_RN:return ".rn";
       case Q_A:return ".a";
@@ -816,6 +818,8 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.push(Q_SYNC);
       }else if(ctx->LO()){
         qualifier.push(Q_LO);
+      }else if(ctx->HI()){
+        qualifier.push(Q_HI);
       }else if(ctx->UNI()){
         qualifier.push(Q_UNI);
       }else if(ctx->RN()){
