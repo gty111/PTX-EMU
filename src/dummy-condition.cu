@@ -23,8 +23,8 @@ bool dummy_h(){
     cudaMemcpy(a_h,a_d,SIZE*sizeof(T),cudaMemcpyDeviceToHost);
 
     for(int i=0;i<SIZE;i++){
-        if(a_h[i]!=i){
-            printf("at:%p expect:%d got:%d\n",&a_h[i],i,a_h[i]);
+        if(a_h[i]!=(i%11==0?i:-i)){
+            printf("at:%p expect:%d got:%d\n",&a_h[i],(i%11==0?i:-i),a_h[i]);
             printf("FAIL\n");
             ifPASS = 1;
             goto End;
