@@ -13,7 +13,8 @@
 
 enum DTYPE{
     DFLOAT,
-    DINT
+    DINT,
+    DNONE
 };
 
 class IMM{
@@ -62,7 +63,7 @@ class PtxInterpreter{
     std::map<std::string,PtxInterpreter::Symtable*>name2Sym;
     std::map<std::string,PtxInterpreter::Reg*>name2Reg;
 
-    IMM imm;
+    std::queue<IMM*> imm; // TODO fix memory leak
 
     void launchPtxInterpreter(PtxContext &ptx,std::string &kernel,void **args,
         dim3 &gridDim,dim3 &blockDim){
@@ -119,9 +120,20 @@ class PtxInterpreter{
                     auto ee = e.second;
                     void *base = ee->addr;
                     for(int i=0;i<ee->elementNum;i++){
-                        switch(ee->byteNum){
-                        case 4:std::printf("%s%d:%lx\n",ee->name.c_str(),i,*(uint32_t*)(base+i*ee->byteNum));break;
-                        case 8:std::printf("%s%d:%lx\n",ee->name.c_str(),i,*(uint64_t*)(base+i*ee->byteNum));break;
+                        switch(ee->name[0]){
+                        case 'r':
+                            switch(ee->byteNum){
+                            case 4:std::printf("%s%d:%lx\n",ee->name.c_str(),i,*(uint32_t*)(base+i*ee->byteNum));break;
+                            case 8:std::printf("%s%d:%lx\n",ee->name.c_str(),i,*(uint64_t*)(base+i*ee->byteNum));break;
+                            }
+                            break;
+                        case 'f':
+                            switch(ee->byteNum){
+                            case 4:std::printf("%s%d:%f\n",ee->name.c_str(),i,*(float*)(base+i*ee->byteNum));break;
+                            case 8:std::printf("%s%d:%lf\n",ee->name.c_str(),i,*(double*)(base+i*ee->byteNum));break;
+                            }
+                            break;
+                        default:assert(0);
                         }
                     }
                 }
@@ -158,7 +170,11 @@ class PtxInterpreter{
         switch(s.statementType){
         case S_REG:{
             auto ss = (StatementContext::REG*)s.statement;
-            if(name2Reg[ss->regName])return; // already alloc
+            if(name2Reg[ss->regName]){
+                auto reg = name2Reg[ss->regName];
+                memset(reg->addr,0,reg->elementNum*reg->byteNum);
+                return; // already alloc
+            }
             assert(ss->regDataType.size()==1);
             PtxInterpreter::Reg *reg = new PtxInterpreter::Reg();
             reg->regType = ss->regDataType.back();
@@ -379,7 +395,7 @@ class PtxInterpreter{
             void *op2 = getOperandAddr(ss->madOp[3],ss->madQualifier);
 
             // exe mad
-            void *t = malloc(8);
+            void *t = malloc(16);
 
             mul(t,op0,op1,ss->madQualifier);
 
@@ -389,7 +405,29 @@ class PtxInterpreter{
             return;
         }
         case S_FMA:{
-            assert(0);
+            auto ss = (StatementContext::FMA*)s.statement;
+
+            // op0
+            void *to = getOperandAddr(ss->fmaOp[0],ss->fmaQualifier);
+
+            // op1
+            void *op0 = getOperandAddr(ss->fmaOp[1],ss->fmaQualifier);
+
+            // op2
+            void *op1 = getOperandAddr(ss->fmaOp[2],ss->fmaQualifier);
+
+            // op3
+            void *op2 = getOperandAddr(ss->fmaOp[3],ss->fmaQualifier);
+
+            void *t = malloc(8);
+
+
+            // exe fma
+            mul(t,op0,op1,ss->fmaQualifier);
+
+            add(to,t,op2,ss->fmaQualifier);
+
+            free(t);
             return;
         }
         case S_WMMA:{
@@ -443,32 +481,34 @@ class PtxInterpreter{
     // helper function
 
     void setIMM(std::string s,Qualifier q){
-        this->imm.type = q;
+        IMM *t_imm = new IMM();
+        t_imm->type = q;
         switch(q){
         case Q_S64:case Q_U64:case Q_B64:
-        this->imm.data.u64 = stol(s,0,0);
-        return;
+        t_imm->data.u64 = stol(s,0,0);
+        break;
         case Q_S32:case Q_U32:case Q_B32:
-        this->imm.data.u32 = stoi(s,0,0);
-        return;
+        t_imm->data.u32 = stoi(s,0,0);
+        break;
         case Q_S16:case Q_U16:case Q_B16:
-        this->imm.data.u16 = stoi(s,0,0);
-        return;
+        t_imm->data.u16 = stoi(s,0,0);
+        break;
         case Q_S8:case Q_U8:case Q_B8:
-        this->imm.data.u8 = stoi(s,0,0);
-        return;
+        t_imm->data.u8 = stoi(s,0,0);
+        break;
         case Q_F64:
         assert(s.size()==18&&(s[1]=='d'||s[1]=='D'));
         s[1] = 'x';
-        *(uint64_t*)&(this->imm.data.f64) = stoull(s,0,0);
-        return;
+        *(uint64_t*)&(t_imm->data.f64) = stoull(s,0,0);
+        break;
         case Q_F32:
         assert(s.size()==10&&(s[1]=='f'||s[1]=='F'));
         s[1] = 'x';
-        *(uint32_t*)&(this->imm.data.f32) = stoi(s,0,0);
-        return;
+        *(uint32_t*)&(t_imm->data.f32) = stoi(s,0,0);
+        break;
         default:assert(0);
         }
+        this->imm.push(t_imm);
     }
 
     int Q2bytes(Qualifier &q){
@@ -509,6 +549,17 @@ class PtxInterpreter{
         assert(0);
     }
 
+    DTYPE getDType(Qualifier q){
+        switch(q){
+        case Q_F64:case Q_F32:case Q_F16:case Q_F8: return DFLOAT;
+        case Q_S64:case Q_B64:case Q_U64:
+        case Q_S32:case Q_B32:case Q_U32:
+        case Q_S16:case Q_B16:case Q_U16:
+        case Q_S8:case Q_B8:case Q_U8:return DINT;
+        }
+        return DNONE;
+    }
+
     int getBits(std::vector<Qualifier>&q){
         int ret;
         for(auto e:q){
@@ -518,9 +569,7 @@ class PtxInterpreter{
     }
 
     int getBits(Qualifier q){
-        std::vector<Qualifier>t;
-        t.push_back(q);
-        return getBits(t);
+        return Q2bytes(q);
     }
 
     void *getOperandAddr(OperandContext &op,std::vector<Qualifier>&q){
@@ -531,7 +580,9 @@ class PtxInterpreter{
         }else if(op.opType==O_IMM){
             setIMM(((OperandContext::IMM*)op.operand)->immVal,
                     getDataType(q));
-            return &(this->imm.data);
+            void *t = &(this->imm.front()->data);
+            this->imm.pop();
+            return t;
         }else assert(0);
     }
 
@@ -560,11 +611,14 @@ class PtxInterpreter{
         }
         if(fa->offset.size()!=0){
             setIMM(fa->offset,Q_U64);
+            IMM *t = this->imm.front();
+            this->imm.pop();
             if(fa->ifMinus){ 
-                ret = (void*)((uint64_t)ret + this->imm.data.u64);
+                ret = (void*)((uint64_t)ret + t->data.u64);
             }else{
-                ret = (void*)((uint64_t)ret - this->imm.data.u64);
+                ret = (void*)((uint64_t)ret - t->data.u64);
             }
+            free(t);
         }
         printf("INTE: FA %p\n",ret);
         return ret;
@@ -637,20 +691,34 @@ class PtxInterpreter{
     }
 
     template<typename T>
-    void _cvt(void *to,void *from,int bitnum){
+    void _cvt(void *to,void *from,int bitnum,DTYPE dtype){
         switch(bitnum){
-        case 8: 
-        __cvt<T,uint64_t>(to,from);
-        return;
-        case 4: 
-        __cvt<T,uint32_t>(to,from);
-        return;
-        case 2:
-        __cvt<T,uint16_t>(to,from);
-        return;
-        case 1:
-        __cvt<T,uint8_t>(to,from);
-        return;
+        case 8: {
+                if(dtype==DINT)
+                    __cvt<T,uint64_t>(to,from);
+                else if(dtype==DFLOAT)
+                    __cvt<T,double>(to,from);
+                else assert(0);
+                return;
+            }
+            case 4: {
+                if(dtype==DINT)
+                    __cvt<T,uint32_t>(to,from);
+                else if(dtype==DFLOAT)
+                    __cvt<T,float>(to,from);
+                else assert(0);
+                return;
+            }
+            case 2:{
+                assert(dtype==DINT);
+                __cvt<T,uint16_t>(to,from);
+                return;
+            }
+            case 1:{
+                assert(dtype==DINT);
+                __cvt<T,uint8_t>(to,from);
+                return;
+            }
         default: assert(0);
         }
     }
@@ -662,21 +730,43 @@ class PtxInterpreter{
             if(idx==2)break;
         }
         assert(idx==2);
+        DTYPE dtype[2];
+        idx = 0;
+        for(auto e:q){
+            if(getDType(e)!=DNONE)dtype[idx++] = getDType(e);
+            if(idx==2)break;
+        }
+        assert(idx==2);
         switch(bitnum[0]){
-            case 8: 
-            _cvt<uint64_t>(to,from,bitnum[1]);
-            return;
-            case 4: 
-            _cvt<uint32_t>(to,from,bitnum[1]);
-            return;
-            case 2:
-            _cvt<uint16_t>(to,from,bitnum[1]);
-            return;
-            case 1:
-            _cvt<uint8_t>(to,from,bitnum[1]);
-            return;
+            case 8: {
+                if(dtype[0]==DINT)
+                    _cvt<uint64_t>(to,from,bitnum[1],dtype[1]);
+                else if(dtype[0]==DFLOAT)
+                    _cvt<double>(to,from,bitnum[1],dtype[1]);
+                else assert(0);
+                return;
+            }
+            case 4: {
+                if(dtype[0]==DINT)
+                    _cvt<uint32_t>(to,from,bitnum[1],dtype[1]);
+                else if(dtype[0]==DFLOAT)
+                    _cvt<float>(to,from,bitnum[1],dtype[1]);
+                else assert(0);
+                return;
+            }
+            case 2:{
+                assert(dtype[0]==DINT);
+                _cvt<uint16_t>(to,from,bitnum[1],dtype[1]);
+                return;
+            }
+            case 1:{
+                assert(dtype[0]==DINT);
+                _cvt<uint8_t>(to,from,bitnum[1],dtype[1]);
+                return;
+            }
             default: assert(0);
         }
+        
     }
 
     template<typename T>
@@ -737,12 +827,14 @@ class PtxInterpreter{
     void _mulfloat(void *to,void *op1,void *op2){
         *(T*)to = *(T*)op1 * *(T*)op2;
     }
-
+    
+    // TODO implement float Qualifier and fix float precision loss
     void mul(void *to,void *op1,void *op2,std::vector<Qualifier>&q){
         printf("INTE: mul dest:%p op1:%p op2:%p\n",to,op1,op2);
         int len = getBits(q);
         DTYPE dtype = getDType(q);
-        Qualifier mulType = getMulQ(q);
+        Qualifier mulType;
+        if(dtype==DINT)mulType = getMulQ(q);
         switch(len){
         case 1:
         switch(mulType){
@@ -792,19 +884,34 @@ class PtxInterpreter{
 
     void mov(void *from,void *to,std::vector<Qualifier>&q){
         int len = getBits(q);
+        DTYPE dtype = getDType(q);
         switch(len){
-        case 1:
-        _mov<uint8_t>(from,to);
-        return;
-        case 2:
-        _mov<uint16_t>(from,to);
-        return;
-        case 4:
-        _mov<uint32_t>(from,to);
-        return;
-        case 8:
-        _mov<uint64_t>(from,to);
-        return;
+        case 1:{
+            assert(dtype==DINT);
+            _mov<uint8_t>(from,to);
+            return;
+        }
+        case 2:{
+            assert(dtype==DINT);
+            _mov<uint16_t>(from,to);
+            return;
+        }
+        case 4:{
+            if(dtype==DINT)
+                _mov<uint32_t>(from,to);
+            else if(dtype==DFLOAT)
+                _mov<float>(from,to);
+            else assert(0);
+            return;
+        }
+        case 8:{
+            if(dtype==DINT)
+                _mov<uint64_t>(from,to);
+            else if(dtype==DFLOAT)
+                _mov<double>(from,to);
+            else assert(0);
+            return;
+        }
         default:assert(0);
         }
     }
