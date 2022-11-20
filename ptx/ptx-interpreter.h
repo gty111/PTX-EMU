@@ -41,6 +41,8 @@ class PtxInterpreter{
 
     dim3 curGridIdx,curBlockIdx;
 
+    int pc;
+    bool exit=0;
 
     class Symtable{
         public:
@@ -62,6 +64,7 @@ class PtxInterpreter{
 
     std::map<std::string,PtxInterpreter::Symtable*>name2Sym;
     std::map<std::string,PtxInterpreter::Reg*>name2Reg;
+    std::map<std::string,int>name2pc;
 
     std::queue<IMM*> imm; // TODO fix memory leak
 
@@ -75,6 +78,7 @@ class PtxInterpreter{
       this->blockDim = blockDim;
       name2Sym.clear();
       name2Reg.clear();
+      name2pc.clear();
       curBlockIdx.x = 0;
       curBlockIdx.y = 0;
       curBlockIdx.z = 0;
@@ -103,45 +107,65 @@ class PtxInterpreter{
             s->val = (uint64_t)kernelArgs[i];
             name2Sym[s->name] = s;
         }
+
+        // setup label to jump
+        for(int i=0;i<kernelContext->kernelStatements.size();i++){
+            auto e = kernelContext->kernelStatements[i];
+            if(e.statementType==S_DOLLOR){
+                auto s = (StatementContext::DOLLOR*)e.statement;
+                name2pc[s->dollorName] = i;
+            }
+        }
         
         // exe every thread
         while(1){
             // exe every inst
-            #ifdef LOGINTE
-            std::printf("INTE: GridIdx(%d,%d,%d) BlockIdx(%d,%d,%d)\n",
-                curGridIdx.x,curGridIdx.y,curGridIdx.z,
-                curBlockIdx.x,curBlockIdx.y,curBlockIdx.z);
-            #endif
-            for(auto &e:kernelContext->kernelStatements){
+            pc = -1;
+            exit = 0;
+            while(!exit){
+                pc++;
+                assert(pc>=0 && pc<kernelContext->kernelStatements.size());
+                auto e = kernelContext->kernelStatements[pc];
                 #ifdef DEBUGINTE
                 getchar();
+                std::printf("\nINTE: GridIdx(%d,%d,%d) BlockIdx(%d,%d,%d)\n",
+                    curGridIdx.x,curGridIdx.y,curGridIdx.z,
+                    curBlockIdx.x,curBlockIdx.y,curBlockIdx.z);
                 #endif
                 exe_once(e);
                 #ifdef DEBUGINTE
+                std::printf("PC:%d\n",pc);
+                int toti = 0;
                 for(auto &e:name2Reg){
                     auto ee = e.second;
                     void *base = ee->addr;
-                    for(int i=0;i<ee->elementNum;i++){
+                    for(int i=0;i<ee->elementNum;i++,toti++){
                         switch(ee->name[0]){
                         case 'r':
-                            switch(ee->byteNum){
-                            case 4:std::printf("%s%d:%lx\n",ee->name.c_str(),i,*(uint32_t*)(base+i*ee->byteNum));break;
-                            case 8:std::printf("%s%d:%lx\n",ee->name.c_str(),i,*(uint64_t*)(base+i*ee->byteNum));break;
-                            }
-                            break;
+                        switch(ee->byteNum){
+                        case 4:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
+                            *(uint32_t*)((uint64_t)base+i*ee->byteNum));break;
+                        case 8:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
+                            *(uint64_t*)((uint64_t)base+i*ee->byteNum));break;
+                        }
+                        break;
                         case 'f':
-                            switch(ee->byteNum){
-                            case 4:std::printf("%s%d:%f\n",ee->name.c_str(),i,*(float*)(base+i*ee->byteNum));break;
-                            case 8:std::printf("%s%d:%lf\n",ee->name.c_str(),i,*(double*)(base+i*ee->byteNum));break;
-                            }
-                            break;
+                        switch(ee->byteNum){
+                        case 4:std::printf("%5s%-3d:%-16f ",ee->name.c_str(),i,
+                            *(float*)((uint64_t)base+i*ee->byteNum));break;
+                        case 8:std::printf("%5s%-3d:%-16lf ",ee->name.c_str(),i,
+                            *(double*)((uint64_t)base+i*ee->byteNum));break;
+                        }
+                        break;
                         case 'p':
-                            std::printf("%s%d:%d\n",ee->name.c_str(),i,*(uint8_t*)(base+i*ee->byteNum));
-                            break;
+                        std::printf("%5s%-3d:%-16d ",ee->name.c_str(),i,
+                            *(uint8_t*)((uint64_t)base+i*ee->byteNum));break;
                         default:assert(0);
                         }
+                        if((toti+1)%4==0)std::printf("\n");
                     }
                 }
+                std::printf("\n");
                 #endif
             }
             curBlockIdx.x ++;
@@ -172,6 +196,9 @@ class PtxInterpreter{
     }
 
     void exe_once(StatementContext &s){
+        //#ifdef LOGINTE
+        std::printf("INTE: %s\n",S2s(s.statementType).c_str());
+        //#endif
         switch(s.statementType){
         case S_REG:{
             auto ss = (StatementContext::REG*)s.statement;
@@ -200,11 +227,19 @@ class PtxInterpreter{
             return;
         }
         case S_DOLLOR:{
-            assert(0);
+            // do nothing
             return;
         }
         case S_AT:{
-            assert(0);
+            auto ss = (StatementContext::AT*)s.statement;
+
+            // pred
+            std::vector<Qualifier>t;
+            void *pred = getOperandAddr(ss->atOp,t);
+
+            // exe at
+            at(pred,ss->atLabelName);
+
             return;
         }
         case S_PRAGMA:{
@@ -212,7 +247,7 @@ class PtxInterpreter{
             return;
         }
         case S_RET:{
-            // do nothing
+            exit = 1;
             return;
         }
         case S_BAR:{
@@ -547,6 +582,23 @@ class PtxInterpreter{
             assert(0);
             return;
         }
+        case S_REM:{
+            auto ss = (StatementContext::REM*)s.statement;
+
+            // op0
+            void *to = getOperandAddr(ss->remOp[0],ss->remQualifier);
+
+            // op1
+            void *op0 = getOperandAddr(ss->remOp[1],ss->remQualifier);
+
+            // op2
+            void *op1 = getOperandAddr(ss->remOp[2],ss->remQualifier);
+
+            // exe rem
+            rem(to,op0,op1,ss->remQualifier);
+
+            return;
+        }
         default: assert(0);
         }
     }
@@ -697,9 +749,6 @@ class PtxInterpreter{
             }
             free(t);
         }
-        #ifdef LOGINTE
-        printf("INTE: FA %p\n",ret);
-        #endif
         return ret;
     }
 
@@ -746,6 +795,54 @@ class PtxInterpreter{
                 return gridDim.z;
             }else assert(0);
         }else assert(0);
+    }
+
+    void at(void *pred,std::string &label){
+        if(*(uint8_t*)pred){
+            pc = name2pc[label];
+            assert(pc!=0);
+        }
+    }
+
+    template<typename T>
+    void _rem(void *to,void *op0,void *op1){
+        *(T*)to = *(T*)op0 % *(T*)op1 ;
+    }
+
+    void rem(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
+        int len = getBits(q);
+        Qualifier datatype = getDataType(q);
+        switch(len){
+        case 1: {
+            if(Signed(datatype))
+                _rem<int8_t>(to,op0,op1);
+            else
+                _rem<uint8_t>(to,op0,op1);
+            return;
+        }
+        case 2: {
+            if(Signed(datatype))
+                _rem<int16_t>(to,op0,op1);
+            else
+                _rem<uint16_t>(to,op0,op1);
+            return;
+        }
+        case 4: {
+            if(Signed(datatype))
+                _rem<int32_t>(to,op0,op1);
+            else
+                _rem<uint32_t>(to,op0,op1);
+            return;
+        }
+        case 8: {
+            if(Signed(datatype))
+                _rem<int64_t>(to,op0,op1);
+            else
+                _rem<uint64_t>(to,op0,op1);
+            return;
+        }
+        default: assert(0);
+        }
     }
 
     template<typename T>
@@ -819,12 +916,23 @@ class PtxInterpreter{
         *(uint8_t*)to = *(T*)op0 == *(T*)op1;
     }
 
+    template<typename T>
+    void _setp_lt(void *to,void *op0,void *op1){
+        *(uint8_t*)to = *(T*)op0 < *(T*)op1;
+    }
+
+    template<typename T>
+    void _setp_le(void *to,void *op0,void *op1){
+        *(uint8_t*)to = *(T*)op0 <= *(T*)op1;
+    }
+
     void setp(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
         Qualifier cmpOp = getCMPOP(q);
         int len = getBits(q);
         DTYPE dtype = getDType(q);
+        Qualifier datatype = getDataType(q);
         switch(cmpOp){
-        case Q_EQ:{
+        case Q_EQ:{ 
             switch(len){
             case 1: {
                 assert(dtype==DINT);
@@ -844,6 +952,82 @@ class PtxInterpreter{
             case 8:{
                 assert(dtype==DINT);
                 _setp_eq<uint64_t>(to,op0,op1);
+                return;
+            }
+            default:assert(0);
+            }
+            return;
+        }
+        case Q_LT:{
+            switch(len){
+            case 1: {
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _setp_lt<int8_t>(to,op0,op1);
+                else 
+                    _setp_lt<uint8_t>(to,op0,op1);
+                return;
+            }
+            case 2:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _setp_lt<int16_t>(to,op0,op1);
+                else 
+                    _setp_lt<uint16_t>(to,op0,op1);
+                return;
+            }
+            case 4:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _setp_lt<int32_t>(to,op0,op1);
+                else
+                    _setp_lt<uint32_t>(to,op0,op1);
+                return;
+            }
+            case 8:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _setp_lt<int64_t>(to,op0,op1);
+                else
+                    _setp_lt<uint64_t>(to,op0,op1);
+                return;
+            }
+            default:assert(0);
+            }
+            return;
+        }
+        case Q_LE:{
+            switch(len){
+            case 1: {
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _setp_le<int8_t>(to,op0,op1);
+                else 
+                    _setp_le<uint8_t>(to,op0,op1);
+                return;
+            }
+            case 2:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _setp_le<int16_t>(to,op0,op1);
+                else 
+                    _setp_le<uint16_t>(to,op0,op1);
+                return;
+            }
+            case 4:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _setp_le<int32_t>(to,op0,op1);
+                else
+                    _setp_le<uint32_t>(to,op0,op1);
+                return;
+            }
+            case 8:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _setp_le<int64_t>(to,op0,op1);
+                else
+                    _setp_le<uint64_t>(to,op0,op1);
                 return;
             }
             default:assert(0);
@@ -927,31 +1111,31 @@ class PtxInterpreter{
     void _cvt(void *to,void *from,int bitnum,DTYPE dtype){
         switch(bitnum){
         case 8: {
-                if(dtype==DINT)
-                    __cvt<T,uint64_t>(to,from);
-                else if(dtype==DFLOAT)
-                    __cvt<T,double>(to,from);
-                else assert(0);
-                return;
-            }
-            case 4: {
-                if(dtype==DINT)
-                    __cvt<T,uint32_t>(to,from);
-                else if(dtype==DFLOAT)
-                    __cvt<T,float>(to,from);
-                else assert(0);
-                return;
-            }
-            case 2:{
-                assert(dtype==DINT);
-                __cvt<T,uint16_t>(to,from);
-                return;
-            }
-            case 1:{
-                assert(dtype==DINT);
-                __cvt<T,uint8_t>(to,from);
-                return;
-            }
+            if(dtype==DINT)
+                __cvt<T,uint64_t>(to,from);
+            else if(dtype==DFLOAT)
+                __cvt<T,double>(to,from);
+            else assert(0);
+            return;
+        }
+        case 4: {
+            if(dtype==DINT)
+                __cvt<T,uint32_t>(to,from);
+            else if(dtype==DFLOAT)
+                __cvt<T,float>(to,from);
+            else assert(0);
+            return;
+        }
+        case 2:{
+            assert(dtype==DINT);
+            __cvt<T,uint16_t>(to,from);
+            return;
+        }
+        case 1:{
+            assert(dtype==DINT);
+            __cvt<T,uint8_t>(to,from);
+            return;
+        }
         default: assert(0);
         }
     }

@@ -11,13 +11,13 @@ CUSRC = $(wildcard src/*.cu)
 #TARGETCU = $(patsubst src/%.cu,%,$(CUSRC))
 
 TESTBIN = dummy dummy-add dummy-float dummy-grid dummy-mul dummy-sub dummy-condition \
-		  dummy-long
+		  dummy-long dummy-sieve
 
 COLOR_RED   = \033[1;31m
 COLOR_GREEN = \033[1;32m
 COLOR_NONE  = \033[0m
 
-all:$(CUSRC) lib
+all:$(CUSRC)
 
 bin/%:src/%.cu
 	$(shell [ ! -d bin ] && mkdir bin)
@@ -25,7 +25,7 @@ bin/%:src/%.cu
 	cuobjdump -xptx $(patsubst src/%.cu,%,$^).1.$(ARCH).ptx $@
 	mv $(patsubst src/%.cu,%,$^).1.$(ARCH).ptx src/$(patsubst src/%.cu,%,$^).ptx
 
-test:$(TESTBIN)
+test:$(TESTBIN) 
 
 $(TESTBIN):%:bin/%
 	@if bin/$@ 2>&1 1>/dev/null ; then \
@@ -41,7 +41,7 @@ lib: # ptx/PTXEMU.cpp ptx/build/*.cpp
 Dlib:
 	$(shell [ ! -d lib ] && mkdir lib)
 	make -C ptx
-	g++ -D DEBUGINTE $(CPP_FLAG) ptx/PTXEMU.cpp ptx/build/*.cpp $(addprefix -I,$(INCLUDE_DIR)) $(addprefix -L,$(LINKPATH)) -lantlr4-runtime -o lib/$(LIB_OUT)
+	g++ -D DEBUGINTE -D LOGINTE $(CPP_FLAG) ptx/PTXEMU.cpp ptx/build/*.cpp $(addprefix -I,$(INCLUDE_DIR)) $(addprefix -L,$(LINKPATH)) -lantlr4-runtime -o lib/$(LIB_OUT)
 
 # export LD_LIBRARY_PATH=~/SIM_ON_GPU/lib:$LD_LIBRARY_PATH
 .PHONY: lib Dlib

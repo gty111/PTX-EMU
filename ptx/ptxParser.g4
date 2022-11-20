@@ -141,6 +141,7 @@ statement : compoundStatement
           | xorStatement
           | absStatement
           | sinStatement
+          | remStatement
           ;
 
 regStatement : REG qualifier reg (LESS DIGITS GREATER)? SEMI ;
@@ -186,6 +187,7 @@ atomStatement : ATOM qualifier* (operandThree|operandFour) SEMI ;
 xorStatement : XOR qualifier* operandThree SEMI ;
 absStatement : ABS qualifier* operandTwo SEMI ;
 sinStatement : SIN qualifier* operandTwo SEMI ;
+remStatement : REM qualifier* operandThree SEMI ;
 
 operandTwo : operand COMMA operand ;
 operandThree : operand COMMA operand COMMA operand;

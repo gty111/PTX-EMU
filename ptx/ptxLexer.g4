@@ -175,6 +175,8 @@ ABS: 'abs' ;
 
 SIN: 'sin' ;
 
+REM: 'rem' ;
+
 /* ************ */
 DOUBLEQUOTES: '"' ;
 
