@@ -1,0 +1,50 @@
+
+
+
+
+
+
+
+
+.version 7.8
+.target sm_80
+.address_size 64
+
+
+
+
+.visible .entry _Z7dummy_dIiEvPT_(
+.param .u64 _Z7dummy_dIiEvPT__param_0
+)
+{
+.reg .pred %p<2>;
+.reg .b32 %r<14>;
+.reg .b64 %rd<5>;
+
+	.shared .align 4 .b8 _ZZ7dummy_dIiEvPT_E7idx_arr[512];
+
+ld.param.u64 %rd1, [_Z7dummy_dIiEvPT__param_0];
+cvta.to.global.u64 %rd2, %rd1;
+mov.u32 %r1, %tid.x;
+shl.b32 %r2, %r1, 2;
+mov.u32 %r3, _ZZ7dummy_dIiEvPT_E7idx_arr;
+add.s32 %r4, %r3, %r2;
+st.shared.u32 [%r4], %r1;
+bar.sync 0;
+mov.u32 %r5, %ntid.x;
+add.s32 %r6, %r5, -1;
+setp.eq.s32 %p1, %r1, %r6;
+add.s32 %r7, %r1, 1;
+selp.b32 %r8, 0, %r7, %p1;
+shl.b32 %r9, %r8, 2;
+add.s32 %r10, %r3, %r9;
+ld.shared.u32 %r11, [%r10];
+mov.u32 %r12, %ctaid.x;
+mad.lo.s32 %r13, %r5, %r12, %r1;
+mul.wide.u32 %rd3, %r13, 4;
+add.s64 %rd4, %rd2, %rd3;
+st.global.u32 [%rd4], %r11;
+ret;
+
+}
+

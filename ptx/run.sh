@@ -1,6 +1,6 @@
 BUILD_DIR="build"
 BIN_DIR="bin"
-TARGET="cpp"
+TARGET="java"
 LINKPATH="/root/antlr4/runtime/Cpp/run/usr/local/lib"
 # grun ptx ast -gui
 # export LD_LIBRARY_PATH=/root/antlr4/runtime/Cpp/run/usr/local/lib:$LD_LIBRARY_PATH

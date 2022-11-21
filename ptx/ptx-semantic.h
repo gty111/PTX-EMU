@@ -1024,7 +1024,7 @@ class PtxListener : public ptxParserBaseListener{
       if(ctx->DIGITS(1)){
         st->sharedSize = stoi(ctx->DIGITS(1)->getText());
       }else{
-        st->sharedSize = 0;
+        st->sharedSize = 1;
       }
 
       /* end */
@@ -2132,10 +2132,14 @@ class PtxListener : public ptxParserBaseListener{
       if(ctx->ID()){
         fa->ID = ctx->ID()->getText();
         fa->reg = nullptr;
-      }else if(ctx->reg()){
+      }else if(ctx->regi()){
         // assume base not require regMinorName
         fa->reg = new OperandContext();
-        fetchOperand(*fa->reg);
+        OperandContext::REG *r = new OperandContext::REG();
+        extractREG(ctx->regi()->ID(0)->getText(),r->regIdx,r->regMajorName);
+        r->regMinorName = ctx->regi()->ID(1) ? ctx->regi()->ID(1)->getText() : "";
+        fa->reg->opType = O_REG;
+        fa->reg->operand = r;
       }else assert(0);
 
       /* minus */

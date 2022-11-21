@@ -34,6 +34,8 @@ int Q2bytes(Qualifier &q){
     }
 }
 
+uint64_t SHMEMADDR = 0; // log SHMEMADDR high 32bits
+
 class PtxInterpreter{
   public:
     PtxContext *ptxContext;
@@ -113,7 +115,7 @@ class PtxInterpreter{
                 getchar();
                 #endif
                 _exe_once(s);
-                #ifdef DEBUGINTE
+                #ifdef LOGINTE
                 std::printf("INTE: BlockIdx(%d,%d,%d) ThreadIdx(%d,%d,%d)\n",
                     BlockIdx.x,BlockIdx.y,BlockIdx.z,
                     ThreadIdx.x,ThreadIdx.y,ThreadIdx.z);
@@ -161,24 +163,44 @@ class PtxInterpreter{
             switch(s.statementType){
             case S_REG:{
                 auto ss = (StatementContext::REG*)s.statement;
+                /*
                 if(name2Reg[ss->regName]){
                     auto reg = name2Reg[ss->regName];
                     memset(reg->addr,0,reg->elementNum*reg->byteNum);
                     return; // already alloc
                 }
+                */
                 assert(ss->regDataType.size()==1);
                 PtxInterpreter::Reg *reg = new PtxInterpreter::Reg();
                 reg->regType = ss->regDataType.back();
                 reg->name = ss->regName;
                 reg->elementNum = ss->regNum;
                 reg->byteNum = Q2bytes(ss->regDataType.back());
-                assert(reg->byteNum);
+                assert(reg->byteNum&&reg->elementNum);
                 reg->addr = calloc(reg->elementNum,reg->byteNum);
                 name2Reg[reg->name] = reg;
                 return;
             }
             case S_SHARED:{
-                assert(0);
+                auto ss = (StatementContext::SHARED*)s.statement;
+                if((*name2Share)[ss->sharedName]){
+                    // other thread in same cta alloc before
+                    return;
+                }
+                assert(ss->sharedDataType.size()==1);
+                PtxInterpreter::Symtable *share = new PtxInterpreter::Symtable();
+                share->byteNum = getBytes(ss->sharedDataType);
+                share->elementNum = ss->sharedSize;
+                share->name = ss->sharedName;
+                share->symType = ss->sharedDataType.back();
+                assert(share->byteNum&&share->elementNum);
+                share->val = (uint64_t)calloc(share->elementNum,share->byteNum);
+                if(SHMEMADDR){
+                    assert(share->val >> 32 == SHMEMADDR);
+                }else{
+                    SHMEMADDR = share->val >> 32;
+                }
+                (*name2Share)[share->name] = share;
                 return;
             }
             case S_LOCAL:{
@@ -210,7 +232,7 @@ class PtxInterpreter{
                 return;
             }
             case S_BAR:{
-                assert(0);
+                state = BAR;
                 return;
             }
             case S_BRA:{
@@ -223,18 +245,18 @@ class PtxInterpreter{
             }
             case S_LD:{
                 auto ss = (StatementContext::LD*)s.statement;
-                if(QvecHasQ(ss->ldQualifier,Q_PARAM)){
-                    // .param
 
-                    // process op0
-                    void *to = getOperandAddr(ss->ldOp[0],ss->ldQualifier);
+                // process op0
+                void *to = getOperandAddr(ss->ldOp[0],ss->ldQualifier);
 
-                    // process op1
-                    void *from = getOperandAddr(ss->ldOp[1],ss->ldQualifier);
+                // process op1
+                void *from = getOperandAddr(ss->ldOp[1],ss->ldQualifier);
+                if(QvecHasQ(ss->ldQualifier,Q_SHARED)){
+                    from = (void *)((uint64_t)from + (SHMEMADDR<<32));
+                }
 
-                    // exe ld
-                    mov(from,to,ss->ldQualifier);
-                }else assert(0);
+                // exe ld
+                mov(from,to,ss->ldQualifier);
                 return;
             }
             case S_MOV:{
@@ -406,7 +428,9 @@ class PtxInterpreter{
 
                 // op0
                 void *to = getOperandAddr(ss->stOp[0],ss->stQualifier);
-                to = (void*)*(uint64_t*)to;
+                if(QvecHasQ(ss->stQualifier,Q_SHARED)){
+                    to = (void*)((uint64_t)to+(SHMEMADDR<<32));
+                }
 
                 // op1
                 void *from = getOperandAddr(ss->stOp[1],ss->stQualifier);
@@ -633,7 +657,7 @@ class PtxInterpreter{
             return DNONE;
         }
 
-        int getBits(std::vector<Qualifier>&q){
+        int getBytes(std::vector<Qualifier>&q){
             int ret;
             for(auto e:q){
                 if(ret=Q2bytes(e))return ret;
@@ -641,7 +665,7 @@ class PtxInterpreter{
             return 0;
         }
 
-        int getBits(Qualifier q){
+        int getBytes(Qualifier q){
             return Q2bytes(q);
         }
 
@@ -649,14 +673,20 @@ class PtxInterpreter{
             if(op.opType==O_REG){
                 return getRegAddr((OperandContext::REG*)op.operand);
             }else if(op.opType==O_FA){
-                return getFaAddr((OperandContext::FA*)op.operand);
+                return getFaAddr((OperandContext::FA*)op.operand,q);
             }else if(op.opType==O_IMM){
                 setIMM(((OperandContext::IMM*)op.operand)->immVal,
                         getDataType(q));
                 void *t = &(this->imm.front()->data);
                 this->imm.pop();
                 return t;
-            }else assert(0);
+            }else if(op.opType==O_VAR){
+                if((*name2Share)[((OperandContext::VAR*)op.operand)->varName]){
+                    return &((*name2Share)[((OperandContext::VAR*)op.operand)->varName]->val);
+                }
+                else assert(0);
+            }
+            else assert(0);
         }
 
         void *getRegAddr(OperandContext::REG *regContext){
@@ -679,11 +709,26 @@ class PtxInterpreter{
             }
         }
 
-        void *getFaAddr(OperandContext::FA *fa){
+        int getRegBytes(OperandContext::REG *regContext){
+            assert(regContext->regMinorName.size()==0);
+            auto reg = name2Reg[regContext->regMajorName];
+            return getBytes(reg->regType);
+        }
+
+        void *getFaAddr(OperandContext::FA *fa,std::vector<Qualifier>&q){
             void *ret;
             if(fa->reg){
-                ret = getRegAddr((OperandContext::REG*)fa->reg->operand);
+                auto reg = (OperandContext::REG*)fa->reg->operand;
+                ret = getRegAddr(reg);
+                switch(getRegBytes(reg)){
+                case 8: ret = (void*)*(uint64_t*)ret;break;
+                case 4: ret = (void*)(uint64_t)*(uint32_t*)ret;break;
+                default:assert(0);
+                }
             }else{
+                #ifdef LOGINTE
+                printf("INTE: access %s\n",fa->ID.c_str());
+                #endif
                 ret = (void*)name2Sym[fa->ID]->val;
             }
             if(fa->offset.size()!=0){
@@ -758,7 +803,7 @@ class PtxInterpreter{
         }
 
         void rem(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
-            int len = getBits(q);
+            int len = getBytes(q);
             Qualifier datatype = getDataType(q);
             switch(len){
             case 1: {
@@ -799,7 +844,7 @@ class PtxInterpreter{
         }
 
         void selp(void *to,void *op0,void *op1,void *pred,std::vector<Qualifier>&q){
-            int len = getBits(q);
+            int len = getBytes(q);
             DTYPE dtype = getDType(q);
             switch(len){
             case 1:
@@ -876,7 +921,7 @@ class PtxInterpreter{
 
         void setp(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
             Qualifier cmpOp = getCMPOP(q);
-            int len = getBits(q);
+            int len = getBytes(q);
             DTYPE dtype = getDType(q);
             Qualifier datatype = getDataType(q);
             switch(cmpOp){
@@ -999,7 +1044,7 @@ class PtxInterpreter{
         }
 
         void shr(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
-            int len = getBits(q);
+            int len = getBytes(q);
             Qualifier datatype = getDataType(q);
             switch(len){
             case 1: {
@@ -1040,7 +1085,7 @@ class PtxInterpreter{
         }
 
         void shl(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
-            int len = getBits(q);
+            int len = getBytes(q);
             switch(len){
             case 1: _shl<uint8_t>(to,op0,op1);return;
             case 2: _shl<uint16_t>(to,op0,op1);return;
@@ -1091,7 +1136,7 @@ class PtxInterpreter{
         void cvt(void *to,void *from,std::vector<Qualifier>&q){
             int bitnum[2],idx=0;
             for(auto e:q){
-                if(getBits(e))bitnum[idx++] = getBits(e);
+                if(getBytes(e))bitnum[idx++] = getBytes(e);
                 if(idx==2)break;
             }
             assert(idx==2);
@@ -1140,7 +1185,7 @@ class PtxInterpreter{
         }
 
         void sub(void *to,void *op1,void *op2,std::vector<Qualifier>&q){
-            int len = getBits(q);
+            int len = getBytes(q);
             DTYPE dtype = getDType(q);
             switch(len){
             case 1:
@@ -1174,7 +1219,7 @@ class PtxInterpreter{
         }
 
         void add(void *to,void *op1,void *op2,std::vector<Qualifier>&q){
-            int len = getBits(q);
+            int len = getBytes(q);
             DTYPE dtype = getDType(q);
             switch(len){
             case 1:
@@ -1230,7 +1275,7 @@ class PtxInterpreter{
         
         // TODO implement float Qualifier and fix float precision loss
         void mul(void *to,void *op1,void *op2,std::vector<Qualifier>&q){
-            int len = getBits(q);
+            int len = getBytes(q);
             DTYPE dtype = getDType(q);
             Qualifier mulType;
             if(dtype==DINT)mulType = getMulQ(q);
@@ -1281,7 +1326,7 @@ class PtxInterpreter{
         }
 
         void mov(void *from,void *to,std::vector<Qualifier>&q){
-            int len = getBits(q);
+            int len = getBytes(q);
             DTYPE dtype = getDType(q);
             switch(len){
             case 1:{
@@ -1319,7 +1364,8 @@ class PtxInterpreter{
         public:
         ThreadContext *thread=nullptr;
         bool *exitThread=nullptr;
-        int threadNum,curExeThreadId,exitThreadNum;
+        bool *barThread=nullptr;
+        int threadNum,curExeThreadId,exitThreadNum,barThreadNum;
         dim3 blockIdx,GridDim,BlockDim;
         std::map<std::string,PtxInterpreter::Symtable*>name2Share;
 
@@ -1331,6 +1377,7 @@ class PtxInterpreter{
             threadNum = BlockDim.x * BlockDim.y * BlockDim.z;
             curExeThreadId = 0;
             exitThreadNum = 0;
+            barThreadNum = 0;
 
             this->GridDim = GridDim;
             this->BlockDim = BlockDim;
@@ -1340,7 +1387,9 @@ class PtxInterpreter{
             assert(threadNum>0 && threadNum<=2048);
             if(!thread)thread = new ThreadContext[threadNum];
             if(!exitThread)exitThread = new bool[threadNum];
+            if(!barThread)barThread = new bool[threadNum];
             memset(exitThread,0,sizeof(bool)*threadNum);
+            memset(barThread,0,sizeof(bool)*threadNum);
             dim3 threadIdx;
             for(int i=0;i<threadNum;i++){
                 threadIdx.z = i / (BlockDim.x*BlockDim.y);
@@ -1354,11 +1403,25 @@ class PtxInterpreter{
 
         EXE_STATE exe_once(){
             if(exitThreadNum==threadNum)return EXIT;
+            if(barThreadNum==threadNum){
+                #ifdef LOGINTE
+                printf("INTE: bar.sync BlockIdx(%d,%d,%d)\n",
+                    blockIdx.x,blockIdx.y,blockIdx.z);
+                #endif
+                for(int i=0;i<threadNum;i++){
+                    thread[i].state = RUN;
+                    barThread[i] = 0;
+                }
+                barThreadNum = 0;
+            }
             EXE_STATE state = thread[curExeThreadId].exe_once();
             if(state!=RUN){
                 if(state==EXIT&&!exitThread[curExeThreadId]){
                     exitThreadNum ++;
                     exitThread[curExeThreadId] = 1;
+                }else if(state==BAR&&!barThread[curExeThreadId]){
+                    barThreadNum ++;
+                    barThread[curExeThreadId] = 1;
                 }
                 curExeThreadId ++;
                 curExeThreadId %= threadNum;
@@ -1380,6 +1443,7 @@ class PtxInterpreter{
       kernelArgs = args;
       this->gridDim = gridDim;
       this->blockDim = blockDim;
+      SHMEMADDR = 0;
       // find KernelContext
       for(auto &e:ptx.ptxKernels){
         if(e.kernelName==kernel){

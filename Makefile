@@ -11,7 +11,7 @@ CUSRC = $(wildcard src/*.cu)
 #TARGETCU = $(patsubst src/%.cu,%,$(CUSRC))
 
 TESTBIN = dummy dummy-add dummy-float dummy-grid dummy-mul dummy-sub dummy-condition \
-		  dummy-long dummy-sieve
+		  dummy-long dummy-sieve dummy-share
 
 COLOR_RED   = \033[1;31m
 COLOR_GREEN = \033[1;32m
