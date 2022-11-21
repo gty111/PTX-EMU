@@ -67,7 +67,7 @@ template <typename T> struct cuda_vector {
    printf("---------------\n");
    for(int i=0;i<host_data.size()/dim;i++){
       for(int j=0;j<dim;j++){
-         std::printf("%4.0f",(float)host_data[i*dim+j]);
+         std::printf("%5.3f",(float)host_data[i*dim+j]);
          if(j==dim-1) std::printf("\n");
          else std::printf(" ");
       }
@@ -154,7 +154,8 @@ void simple_GEMM(int M,int N,int K,TIN *a_in,TIN *b_in,TOUT *c_out){
 
 
 template<typename TIN,typename TOUT>
-bool valid(int M,int N,int K,TIN *a,TIN *b,TOUT *c,double threshold=1e-3){
+bool valid(int M,int N,int K,TIN *a,TIN *b,TOUT *c,double threshold=1e-10){
+   double max_err = 0,sum_err = 0;
    for(int i=0;i<M;i++)
    for(int j=0;j<N;j++){
       TOUT val = 0;
@@ -162,13 +163,18 @@ bool valid(int M,int N,int K,TIN *a,TIN *b,TOUT *c,double threshold=1e-3){
          val += a[i*K+p] * b[p*N+j];
       }
       TOUT abs = val>c[i*N+j] ? val-c[i*N+j] : c[i*N+j] - val;
+      max_err = max(max_err,abs/val);
+      sum_err += abs/val;
       if(abs/val>threshold){
-         printf("at %d %d ",i,j);
+         printf("(%d,%d) ",i,j);
          printf("expect:%f got:%f relative error:%f%%(>%f%%)\n",
             (float)val,(float)c[i*N+j],(float)abs/val*100,threshold*100);
          return 0;
       }
    }
+   sum_err /= M*N;
+   printf("max relative error:%lf%% average relative error:%lf%%\n",
+      max_err*100,sum_err*100);
    return 1;
 }
 
@@ -184,7 +190,7 @@ void benchmark(int M,int N,int K,bool ifcheck=1){
    printf("----------------\n");
    printf("M:%d N:%d K:%d\n",M,N,K);
 
-   srand(time(NULL));
+   srand(8);
 
    TIN *a,*b;
    TOUT *c;
@@ -198,7 +204,7 @@ void benchmark(int M,int N,int K,bool ifcheck=1){
 
    simple_GEMM<TIN,TOUT,16,16>(M,N,K,a,b,c);
 
-   if(ifcheck && valid<TIN,TOUT>(M,N,K,a,b,c,1e-2)){
+   if(ifcheck && valid<TIN,TOUT>(M,N,K,a,b,c,1e-6)){
       std::printf("check pass\n");
    }else if(ifcheck){
       std::printf("check fail\n");

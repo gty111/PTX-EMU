@@ -11,7 +11,8 @@ CUSRC = $(wildcard src/*.cu)
 #TARGETCU = $(patsubst src/%.cu,%,$(CUSRC))
 
 TESTBIN = dummy dummy-add dummy-float dummy-grid dummy-mul dummy-sub dummy-condition \
-		  dummy-long dummy-sieve dummy-share
+		  dummy-long dummy-sieve dummy-share simpleGEMM-int simpleGEMM-float \
+		  simpleGEMM-double
 
 COLOR_RED   = \033[1;31m
 COLOR_GREEN = \033[1;32m
@@ -28,10 +29,11 @@ bin/%:src/%.cu
 test:$(TESTBIN) 
 
 $(TESTBIN):%:bin/%
+	@printf "[%20s]" $@ ;
 	@if bin/$@ 2>&1 1>/dev/null ; then \
-	printf "[%20s] $(COLOR_GREEN)PASS$(COLOR_NONE)\n" $@ ; \
+	printf " $(COLOR_GREEN)PASS$(COLOR_NONE)\n" ; \
 	else \
-	printf "[%20s] $(COLOR_RED)FAIL$(COLOR_NONE)\n" $@ ; \
+	printf " $(COLOR_RED)FAIL$(COLOR_NONE)\n"; \
 	fi
 
 lib: # ptx/PTXEMU.cpp ptx/build/*.cpp 

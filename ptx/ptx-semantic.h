@@ -295,7 +295,6 @@ class OperandContext {
         std::string ID;
         OperandContext *reg;
         std::string offset;
-        bool ifMinus;
 
         FA(){}
 
@@ -303,7 +302,6 @@ class OperandContext {
           this->ID = fa.ID;
           this->reg = fa.reg;
           this->offset  = fa.offset;
-          this->ifMinus = fa.ifMinus;
         }
     };
 };
@@ -2141,9 +2139,6 @@ class PtxListener : public ptxParserBaseListener{
         fa->reg->opType = O_REG;
         fa->reg->operand = r;
       }else assert(0);
-
-      /* minus */
-      fa->ifMinus = ctx->MINUS() ? true : false;
 
       /* offset */
       if(ctx->DIGITS()){

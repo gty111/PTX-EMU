@@ -8,6 +8,7 @@
 #define __PTX_INTERPRETER__
 
 #include<driver_types.h>
+#include<cmath>
 
 #include "ptx-semantic.h"
 
@@ -236,7 +237,10 @@ class PtxInterpreter{
                 return;
             }
             case S_BRA:{
-                assert(0);
+                auto ss = (StatementContext::BRA*)s.statement;
+                
+                //exe bra
+                bra(ss->braLabel,ss->braQualifier);
                 return;
             }
             case S_RCP:{
@@ -333,7 +337,19 @@ class PtxInterpreter{
                 return;
             }
             case S_DIV:{
-                assert(0);
+                auto ss = (StatementContext::DIV*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->divOp[0],ss->divQualifier);
+
+                // op1
+                void *op1 = getOperandAddr(ss->divOp[1],ss->divQualifier);
+
+                // op2
+                void *op2 = getOperandAddr(ss->divOp[2],ss->divQualifier);
+
+                // exe mul
+                div(to,op1,op2,ss->divQualifier);
                 return;
             }
             case S_SUB:{
@@ -416,7 +432,19 @@ class PtxInterpreter{
                 return;
             }
             case S_AND:{
-                assert(0);
+                auto ss = (StatementContext::AND*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->andOp[0],ss->andQualifier);
+
+                // op1
+                void *op0 = getOperandAddr(ss->andOp[1],ss->andQualifier);
+
+                // op2
+                void *op1 = getOperandAddr(ss->andOp[2],ss->andQualifier);
+
+                // exe and 
+                And(to,op0,op1,ss->andQualifier);
                 return;
             }
             case S_OR:{
@@ -500,15 +528,8 @@ class PtxInterpreter{
                 // op3
                 void *op2 = getOperandAddr(ss->fmaOp[3],ss->fmaQualifier);
 
-                void *t = malloc(8);
-
-
                 // exe fma
-                mul(t,op0,op1,ss->fmaQualifier);
-
-                add(to,t,op2,ss->fmaQualifier);
-
-                free(t);
+                fma(to,op0,op1,op2,ss->fmaQualifier);
                 return;
             }
             case S_WMMA:{
@@ -732,14 +753,10 @@ class PtxInterpreter{
                 ret = (void*)name2Sym[fa->ID]->val;
             }
             if(fa->offset.size()!=0){
-                setIMM(fa->offset,Q_U64);
+                setIMM(fa->offset,Q_S64);
                 IMM *t = this->imm.front();
                 this->imm.pop();
-                if(fa->ifMinus){ 
-                    ret = (void*)((uint64_t)ret + t->data.u64);
-                }else{
-                    ret = (void*)((uint64_t)ret - t->data.u64);
-                }
+                ret = (void*)((uint64_t)ret + t->data.u64);
                 free(t);
             }
             return ret;
@@ -790,11 +807,54 @@ class PtxInterpreter{
             }else assert(0);
         }
 
+        void fma(void *to,void *op0,void *op1,void *op2,std::vector<Qualifier>&q){
+            int len = getBytes(q);
+            assert(getDType(q)==DFLOAT);
+            switch(len){
+            case 8:{
+                // printf("INTE: %lf * %lf + %lf",
+                //     *(double*)op0,*(double*)op1,*(double*)op2);
+                *(double*)to = std::fma(*(double*)op0,*(double*)op1,*(double*)op2);
+                // printf(" = %lf\n",*(double*)to);
+                return;
+            }
+            case 4:{
+                // printf("INTE: %f * %f + %f",
+                //     *(float*)op0,*(float*)op1,*(float*)op2);
+                *(float*)to = std::fmaf(*(float*)op0,*(float*)op1,*(float*)op2);
+                // printf(" = %f\n",*(float*)to);
+                return;
+            }
+            default:assert(0);
+            }
+        }
+
+        template<typename T>
+        void _and(void *to,void *op0,void *op1){
+            *(T*)to = *(T*)op0 & *(T*)op1;
+        }
+
+        void And(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
+            int len = getBytes(q);
+            switch(len){
+            case 1:_and<uint8_t>(to,op0,op1);return;
+            case 2:_and<uint16_t>(to,op0,op1);return;
+            case 4:_and<uint32_t>(to,op0,op1);return;
+            case 8:_and<uint64_t>(to,op0,op1);return;
+            default:assert(0);
+            }
+        }
+
         void at(void *pred,std::string &label){
             if(*(uint8_t*)pred){
                 pc = label2pc[label];
                 assert(pc!=0);
             }
+        }
+
+        void bra(std::string &braLabel,std::vector<Qualifier>&q){
+            pc = label2pc[braLabel];
+            assert(pc!=0);
         }
 
         template<typename T>
@@ -910,6 +970,11 @@ class PtxInterpreter{
         }
 
         template<typename T>
+        void _setp_ne(void *to,void *op0,void *op1){
+            *(uint8_t*)to = *(T*)op0 != *(T*)op1;
+        }
+
+        template<typename T>
         void _setp_lt(void *to,void *op0,void *op1){
             *(uint8_t*)to = *(T*)op0 < *(T*)op1;
         }
@@ -917,6 +982,16 @@ class PtxInterpreter{
         template<typename T>
         void _setp_le(void *to,void *op0,void *op1){
             *(uint8_t*)to = *(T*)op0 <= *(T*)op1;
+        }
+
+        template<typename T>
+        void _setp_ge(void *to,void *op0,void *op1){
+            *(uint8_t*)to = *(T*)op0 >= *(T*)op1;
+        }
+
+        template<typename T>
+        void _setp_gt(void *to,void *op0,void *op1){
+            *(uint8_t*)to = *(T*)op0 > *(T*)op1;
         }
 
         void setp(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
@@ -945,6 +1020,32 @@ class PtxInterpreter{
                 case 8:{
                     assert(dtype==DINT);
                     _setp_eq<uint64_t>(to,op0,op1);
+                    return;
+                }
+                default:assert(0);
+                }
+                return;
+            }
+            case Q_NE:{ 
+                switch(len){
+                case 1: {
+                    assert(dtype==DINT);
+                    _setp_ne<uint8_t>(to,op0,op1);
+                    return;
+                }
+                case 2:{
+                    assert(dtype==DINT);
+                    _setp_ne<uint16_t>(to,op0,op1);
+                    return;
+                }
+                case 4:{
+                    assert(dtype==DINT);
+                    _setp_ne<uint32_t>(to,op0,op1);
+                    return;
+                }
+                case 8:{
+                    assert(dtype==DINT);
+                    _setp_ne<uint64_t>(to,op0,op1);
                     return;
                 }
                 default:assert(0);
@@ -1021,6 +1122,82 @@ class PtxInterpreter{
                         _setp_le<int64_t>(to,op0,op1);
                     else
                         _setp_le<uint64_t>(to,op0,op1);
+                    return;
+                }
+                default:assert(0);
+                }
+                return;
+            }
+            case Q_GE:{
+                switch(len){
+                case 1: {
+                    assert(dtype==DINT);
+                    if(Signed(datatype))
+                        _setp_ge<int8_t>(to,op0,op1);
+                    else 
+                        _setp_ge<uint8_t>(to,op0,op1);
+                    return;
+                }
+                case 2:{
+                    assert(dtype==DINT);
+                    if(Signed(datatype))
+                        _setp_ge<int16_t>(to,op0,op1);
+                    else 
+                        _setp_ge<uint16_t>(to,op0,op1);
+                    return;
+                }
+                case 4:{
+                    assert(dtype==DINT);
+                    if(Signed(datatype))
+                        _setp_ge<int32_t>(to,op0,op1);
+                    else
+                        _setp_ge<uint32_t>(to,op0,op1);
+                    return;
+                }
+                case 8:{
+                    assert(dtype==DINT);
+                    if(Signed(datatype))
+                        _setp_ge<int64_t>(to,op0,op1);
+                    else
+                        _setp_ge<uint64_t>(to,op0,op1);
+                    return;
+                }
+                default:assert(0);
+                }
+                return;
+            }
+            case Q_GT:{
+                switch(len){
+                case 1: {
+                    assert(dtype==DINT);
+                    if(Signed(datatype))
+                        _setp_gt<int8_t>(to,op0,op1);
+                    else 
+                        _setp_gt<uint8_t>(to,op0,op1);
+                    return;
+                }
+                case 2:{
+                    assert(dtype==DINT);
+                    if(Signed(datatype))
+                        _setp_gt<int16_t>(to,op0,op1);
+                    else 
+                        _setp_gt<uint16_t>(to,op0,op1);
+                    return;
+                }
+                case 4:{
+                    assert(dtype==DINT);
+                    if(Signed(datatype))
+                        _setp_gt<int32_t>(to,op0,op1);
+                    else
+                        _setp_gt<uint32_t>(to,op0,op1);
+                    return;
+                }
+                case 8:{
+                    assert(dtype==DINT);
+                    if(Signed(datatype))
+                        _setp_gt<int64_t>(to,op0,op1);
+                    else
+                        _setp_gt<uint64_t>(to,op0,op1);
                     return;
                 }
                 default:assert(0);
@@ -1221,26 +1398,94 @@ class PtxInterpreter{
         void add(void *to,void *op1,void *op2,std::vector<Qualifier>&q){
             int len = getBytes(q);
             DTYPE dtype = getDType(q);
+            Qualifier datatype = getDataType(q);
             switch(len){
-            case 1:
-            assert(dtype==DINT);
-            _add<uint8_t>(to,op1,op2);
-            return;
-            case 2:
-            assert(dtype==DINT);
-            _add<uint16_t>(to,op1,op2);
-            return;
+            case 1:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _add<int8_t>(to,op1,op2);
+                else
+                    _add<uint8_t>(to,op1,op2);
+                return;
+            }
+            case 2:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _add<int16_t>(to,op1,op2);
+                else
+                    _add<uint16_t>(to,op1,op2);
+                return;
+            }
             case 4:
             switch(dtype){
-                case DINT: _add<uint32_t>(to,op1,op2);return;
+                case DINT: {
+                    if(Signed(datatype))
+                        _add<int32_t>(to,op1,op2);
+                    else
+                        _add<uint32_t>(to,op1,op2);
+                    return;
+                }
                 case DFLOAT: _add<float>(to,op1,op2);return;
                 default: assert(0);
             }
             return;
             case 8:
             switch(dtype){
-                case DINT: _add<uint64_t>(to,op1,op2);return;
+                case DINT: {
+                    if(Signed(datatype))
+                        _add<int64_t>(to,op1,op2);
+                    else
+                        _add<uint64_t>(to,op1,op2);
+                    return;
+                }
                 case DFLOAT: _add<double>(to,op1,op2);return;
+                default: assert(0);
+            }
+            default: assert(0);
+            }
+        }
+
+        template<typename T>
+        void _div(void *to,void *op0,void *op1){
+            *(T*)to = *(T*)op0 / *(T*)op1;
+        }
+
+        void div(void *to,void *op1,void *op2,std::vector<Qualifier>&q){
+            int len = getBytes(q);
+            DTYPE dtype = getDType(q);
+            Qualifier datatype = getDataType(q);
+            switch(len){
+            case 2:{
+            assert(dtype==DINT);
+            if(Signed(datatype))
+                _div<int16_t>(to,op1,op2);
+            else
+                _div<uint16_t>(to,op1,op2);
+            return;
+            }
+            case 4:
+            switch(dtype){
+                case DINT: {
+                    if(Signed(datatype))
+                        _div<int32_t>(to,op1,op2);
+                    else
+                        _div<uint32_t>(to,op1,op2);
+                    return;
+                }
+                case DFLOAT: _div<float>(to,op1,op2);return;
+                default: assert(0);
+            }
+            return;
+            case 8:
+            switch(dtype){
+                case DINT: {
+                    if(Signed(datatype))
+                        _div<int64_t>(to,op1,op2);
+                    else
+                        _div<uint64_t>(to,op1,op2);
+                    return;
+                }
+                case DFLOAT: _div<double>(to,op1,op2);return;
                 default: assert(0);
             }
             default: assert(0);
@@ -1327,32 +1572,21 @@ class PtxInterpreter{
 
         void mov(void *from,void *to,std::vector<Qualifier>&q){
             int len = getBytes(q);
-            DTYPE dtype = getDType(q);
             switch(len){
             case 1:{
-                assert(dtype==DINT);
                 _mov<uint8_t>(from,to);
                 return;
             }
             case 2:{
-                assert(dtype==DINT);
                 _mov<uint16_t>(from,to);
                 return;
             }
             case 4:{
-                if(dtype==DINT)
-                    _mov<uint32_t>(from,to);
-                else if(dtype==DFLOAT)
-                    _mov<float>(from,to);
-                else assert(0);
+                _mov<uint32_t>(from,to);
                 return;
             }
             case 8:{
-                if(dtype==DINT)
-                    _mov<uint64_t>(from,to);
-                else if(dtype==DFLOAT)
-                    _mov<double>(from,to);
-                else assert(0);
+                _mov<uint64_t>(from,to);
                 return;
             }
             default:assert(0);
