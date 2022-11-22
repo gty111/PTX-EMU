@@ -12,7 +12,8 @@ CUSRC = $(wildcard src/*.cu)
 
 TESTBIN = dummy dummy-add dummy-float dummy-grid dummy-mul dummy-sub dummy-condition \
 		  dummy-long dummy-sieve dummy-share simpleGEMM-int simpleGEMM-float \
-		  simpleGEMM-double
+		  simpleGEMM-double simpleCONV-int simpleCONV-float simpleCONV-double \
+		  2Dentropy
 
 COLOR_RED   = \033[1;31m
 COLOR_GREEN = \033[1;32m

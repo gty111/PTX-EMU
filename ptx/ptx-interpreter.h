@@ -76,6 +76,11 @@ class PtxInterpreter{
         Data data;
     };
 
+    class VEC{
+        public:
+        std::vector<void *>vec;
+    };
+
     class ThreadContext{
         public:
         std::vector<StatementContext>*statements;
@@ -85,6 +90,7 @@ class PtxInterpreter{
         std::map<std::string,int>label2pc;
         dim3 BlockIdx,ThreadIdx,GridDim,BlockDim;
         std::queue<IMM*> imm; // TODO fix memory leak
+        std::queue<VEC*> vec; // TODO fix memory leak
         int pc;
         EXE_STATE state;
 
@@ -164,13 +170,6 @@ class PtxInterpreter{
             switch(s.statementType){
             case S_REG:{
                 auto ss = (StatementContext::REG*)s.statement;
-                /*
-                if(name2Reg[ss->regName]){
-                    auto reg = name2Reg[ss->regName];
-                    memset(reg->addr,0,reg->elementNum*reg->byteNum);
-                    return; // already alloc
-                }
-                */
                 assert(ss->regDataType.size()==1);
                 PtxInterpreter::Reg *reg = new PtxInterpreter::Reg();
                 reg->regType = ss->regDataType.back();
@@ -205,7 +204,16 @@ class PtxInterpreter{
                 return;
             }
             case S_LOCAL:{
-                assert(0);
+                auto ss = (StatementContext::LOCAL*)s.statement;
+                assert(ss->localDataType.size()==1);
+                PtxInterpreter::Symtable *local = new PtxInterpreter::Symtable();
+                local->byteNum = getBytes(ss->localDataType);
+                local->elementNum = ss->localSize;
+                local->name = ss->localName;
+                local->symType = ss->localDataType.back();
+                assert(local->byteNum && local->elementNum);
+                local->val = (uint64_t)calloc(local->elementNum,local->byteNum);
+                name2Sym[local->name] = local;
                 return;
             }
             case S_DOLLOR:{
@@ -225,7 +233,7 @@ class PtxInterpreter{
                 return;
             }
             case S_PRAGMA:{
-                assert(0);
+                // temparily do nothing
                 return;
             }
             case S_RET:{
@@ -244,7 +252,16 @@ class PtxInterpreter{
                 return;
             }
             case S_RCP:{
-                assert(0);
+                auto ss = (StatementContext::RCP*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->rcpOp[0],ss->rcpQualifier);
+
+                // op1
+                void *op = getOperandAddr(ss->rcpOp[1],ss->rcpQualifier);
+
+                // exe rcp
+                rcp(to,op,ss->rcpQualifier);
                 return;
             }
             case S_LD:{
@@ -424,11 +441,35 @@ class PtxInterpreter{
                 return;
             }
             case S_MAX:{
-                assert(0);
+                auto ss = (StatementContext::MAX*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->maxOp[0],ss->maxQualifier);
+
+                // op1
+                void *op0 = getOperandAddr(ss->maxOp[1],ss->maxQualifier);
+
+                // op2
+                void *op1 = getOperandAddr(ss->maxOp[2],ss->maxQualifier);
+
+                // exe max
+                max(to,op0,op1,ss->maxQualifier);
                 return;
             }
             case S_MIN:{
-                assert(0);
+                auto ss = (StatementContext::MIN*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->minOp[0],ss->minQualifier);
+
+                // op1
+                void *op0 = getOperandAddr(ss->minOp[1],ss->minQualifier);
+
+                // op2
+                void *op1 = getOperandAddr(ss->minOp[2],ss->minQualifier);
+
+                // exe max
+                min(to,op0,op1,ss->minQualifier);
                 return;
             }
             case S_AND:{
@@ -448,7 +489,19 @@ class PtxInterpreter{
                 return;
             }
             case S_OR:{
-                assert(0);
+                auto ss = (StatementContext::OR*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->orOp[0],ss->orQualifier);
+
+                // op1
+                void *op0 = getOperandAddr(ss->orOp[1],ss->orQualifier);
+
+                // op2
+                void *op1 = getOperandAddr(ss->orOp[2],ss->orQualifier);
+
+                // exe or 
+                Or(to,op0,op1,ss->orQualifier);
                 return;
             }
             case S_ST:{
@@ -464,8 +517,18 @@ class PtxInterpreter{
                 void *from = getOperandAddr(ss->stOp[1],ss->stQualifier);
 
                 // exe st
-                mov(from,to,ss->stQualifier);
-
+                if(QvecHasQ(ss->stQualifier,Q_V4)){
+                    uint64_t step = getBytes(ss->stQualifier);
+                    auto vecAddr = this->vec.front()->vec;
+                    this->vec.pop();
+                    assert(vecAddr.size()==4);
+                    for(int i=0;i<4;i++){
+                        from = vecAddr[i];
+                        mov((void*)((uint64_t)to+i*step),from,ss->stQualifier);
+                    }
+                }else{
+                    mov(from,to,ss->stQualifier);
+                }
                 return;
             }
             case S_SELP:{
@@ -563,7 +626,16 @@ class PtxInterpreter{
                 return;
             }
             case S_LG2:{
-                assert(0);
+                auto ss = (StatementContext::LG2*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->lg2Op[0],ss->lg2Qualifier);
+
+                // op1
+                void *op = getOperandAddr(ss->lg2Op[1],ss->lg2Qualifier);
+
+                // exe lg2
+                lg2(to,op,ss->lg2Qualifier);
                 return;
             }
             case S_EX2:{
@@ -661,7 +733,8 @@ class PtxInterpreter{
                 case Q_S64:case Q_B64:case Q_U64:
                 case Q_S32:case Q_B32:case Q_U32:
                 case Q_S16:case Q_B16:case Q_U16:
-                case Q_S8:case Q_B8:case Q_U8:return DINT;
+                case Q_S8:case Q_B8:case Q_U8:
+                case Q_PRED:return DINT;
                 }
             }
             assert(0);
@@ -702,10 +775,21 @@ class PtxInterpreter{
                 this->imm.pop();
                 return t;
             }else if(op.opType==O_VAR){
-                if((*name2Share)[((OperandContext::VAR*)op.operand)->varName]){
+                auto var = (OperandContext::VAR*)op.operand;
+                if((*name2Share)[var->varName]){
                     return &((*name2Share)[((OperandContext::VAR*)op.operand)->varName]->val);
+                }else if(name2Sym[var->varName]){
+                    return &(name2Sym[var->varName]->val);
                 }
                 else assert(0);
+            }else if(op.opType==O_VEC){
+                PtxInterpreter::VEC *tvec = new PtxInterpreter::VEC();
+                auto vecContext = (OperandContext::VEC*)op.operand;
+                for(auto e:vecContext->vec){
+                    tvec->vec.push_back(getOperandAddr(e,q));
+                }
+                this->vec.push(tvec);
+                return nullptr;
             }
             else assert(0);
         }
@@ -807,24 +891,165 @@ class PtxInterpreter{
             }else assert(0);
         }
 
+        template<typename T>
+        void _lg2(void *to,void *op){
+            *(T*)to = std::log2(*(T*)op);
+        }
+
+        void lg2(void *to,void *op,std::vector<Qualifier>&q){
+            Qualifier datatype = getDataType(q);
+            assert(datatype==Q_F32);
+            _lg2<float>(to,op);
+        }
+
+        template<typename T>
+        void _fma(void *to,void *op0,void *op1,void *op2){
+            *(T*)to = std::fma(*(T*)op0,*(T*)op1,*(T*)op2);
+        }
+
         void fma(void *to,void *op0,void *op1,void *op2,std::vector<Qualifier>&q){
             int len = getBytes(q);
             assert(getDType(q)==DFLOAT);
             switch(len){
             case 8:{
-                // printf("INTE: %lf * %lf + %lf",
-                //     *(double*)op0,*(double*)op1,*(double*)op2);
-                *(double*)to = std::fma(*(double*)op0,*(double*)op1,*(double*)op2);
-                // printf(" = %lf\n",*(double*)to);
+                _fma<double>(to,op0,op1,op2);
                 return;
             }
             case 4:{
-                // printf("INTE: %f * %f + %f",
-                //     *(float*)op0,*(float*)op1,*(float*)op2);
-                *(float*)to = std::fmaf(*(float*)op0,*(float*)op1,*(float*)op2);
-                // printf(" = %f\n",*(float*)to);
+                _fma<float>(to,op0,op1,op2);
                 return;
             }
+            default:assert(0);
+            }
+        }
+        template<typename T>
+        void _min(void *to,void *op0,void *op1){
+            *(T*)to = std::min( *(T*)op0 , *(T*)op1 ); 
+        }
+
+        void min(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
+            int len = getBytes(q);
+            DTYPE dtype = getDType(q);
+            Qualifier datatype = getDataType(q);
+            switch(len){
+            case 1:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _min<int8_t>(to,op0,op1);
+                else 
+                    _min<uint8_t>(to,op0,op1);
+            } 
+            case 2:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _min<int16_t>(to,op0,op1);
+                else 
+                    _min<uint16_t>(to,op0,op1);
+            } 
+            case 4:
+            switch(dtype){
+            case DINT:{
+                if(Signed(datatype))
+                    _min<int32_t>(to,op0,op1);
+                else
+                    _min<uint32_t>(to,op0,op1);
+                return;
+            }
+            case DFLOAT:_min<float>(to,op0,op1);return;
+            }
+            case 8:switch(dtype){
+            case DINT:{
+                if(Signed(datatype))
+                    _min<int64_t>(to,op0,op1);
+                else
+                    _min<uint64_t>(to,op0,op1);
+                return;
+            }
+            case DFLOAT:_min<double>(to,op0,op1);return;
+            }
+            default:assert(0);
+            }
+        }
+
+        template<typename T>
+        void _max(void *to,void *op0,void *op1){
+            *(T*)to = std::max( *(T*)op0 , *(T*)op1 ); 
+        }
+
+        void max(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
+            int len = getBytes(q);
+            DTYPE dtype = getDType(q);
+            Qualifier datatype = getDataType(q);
+            switch(len){
+            case 1:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _max<int8_t>(to,op0,op1);
+                else 
+                    _max<uint8_t>(to,op0,op1);
+            } 
+            case 2:{
+                assert(dtype==DINT);
+                if(Signed(datatype))
+                    _max<int16_t>(to,op0,op1);
+                else 
+                    _max<uint16_t>(to,op0,op1);
+            } 
+            case 4:
+            switch(dtype){
+            case DINT:{
+                if(Signed(datatype))
+                    _max<int32_t>(to,op0,op1);
+                else
+                    _max<uint32_t>(to,op0,op1);
+                return;
+            }
+            case DFLOAT:_max<float>(to,op0,op1);return;
+            }
+            case 8:switch(dtype){
+            case DINT:{
+                if(Signed(datatype))
+                    _max<int64_t>(to,op0,op1);
+                else
+                    _max<uint64_t>(to,op0,op1);
+                return;
+            }
+            case DFLOAT:_max<double>(to,op0,op1);return;
+            }
+            default:assert(0);
+            }
+        }
+
+        template<typename T>
+        void _rcp(void *to,void *op){
+            *(T*)to = 1 / *(T*)op;
+        }
+
+        void rcp(void *to,void *op,std::vector<Qualifier>&q){
+            int len = getBytes(q);
+            DTYPE dtype = getDType(q);
+            assert(dtype==DFLOAT);
+            switch(len){
+            case 8: _rcp<double>(to,op);return;
+            case 4: _rcp<float>(to,op);return;
+            default: assert(0);
+            }
+        }
+
+        template<typename T>
+        void _or(void *to,void *op0,void *op1){
+            *(T*)to = *(T*)op0 | *(T*)op1;
+        }
+
+        void Or(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
+            int len = getBytes(q);
+            DTYPE dtype = getDType(q);
+            assert(dtype==DINT);
+            switch(len){
+            case 1:_or<uint8_t>(to,op0,op1);return;
+            case 2:_or<uint16_t>(to,op0,op1);return;
+            case 4:_or<uint32_t>(to,op0,op1);return;
+            case 8:_or<uint64_t>(to,op0,op1);return;
             default:assert(0);
             }
         }
@@ -836,6 +1061,8 @@ class PtxInterpreter{
 
         void And(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
             int len = getBytes(q);
+            DTYPE dtype = getDType(q);
+            assert(dtype==DINT);
             switch(len){
             case 1:_and<uint8_t>(to,op0,op1);return;
             case 2:_and<uint16_t>(to,op0,op1);return;

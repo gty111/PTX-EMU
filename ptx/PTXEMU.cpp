@@ -33,6 +33,8 @@ size_t _sharedMem;
 PtxListener ptxListener;
 PtxInterpreter ptxInterpreter;
 
+std::map<uint64_t,bool>memAlloc;
+
 extern "C" {
 
 void** __cudaRegisterFatBinary(
@@ -129,6 +131,7 @@ cudaError_t cudaMalloc(
 )
 {
     *p = malloc(s);
+    memAlloc[(uint64_t)p] = 1;
     printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
@@ -202,7 +205,11 @@ cudaError_t cudaFree(
     void *devPtr
 )
 {
-    free(devPtr);
+    // avoid double free
+    if(memAlloc[(uint64_t)devPtr]){
+        free(devPtr);
+        memAlloc[(uint64_t)devPtr] = 0;
+    }
     printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }
@@ -271,6 +278,7 @@ cudaError_t cudaMallocManaged (
 )
 {
     *devPtr = malloc(size);
+    memAlloc[(uint64_t)devPtr] = 1;
     printf("EMU: call %s\n",__my_func__);
     return cudaSuccess;
 }

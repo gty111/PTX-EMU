@@ -113,29 +113,47 @@ template <typename T> struct wk_vector {
                cudaMemcpyDeviceToHost);
   }
 };
+
+template<typename T>
+bool check(wk_vector<T> w1,wk_vector<T> w2){
+  for(int i=0;i<w1.host_data.size();i++){
+    // printf("at %d:%f %f\n",i,w1.host_data[i],w2.host_data[i]);
+    if(w1.host_data[i]-w2.host_data[i]>1e-6){
+      printf("at %d:%f %f\n",i,w1.host_data[i],w2.host_data[i]);
+      printf("FAIL\n");
+      return 1;
+    }
+  }
+  printf("PASS\n");
+  return 0;
+}
+
 int main() {
-  int W = 7680, H = 4320;
-  //int W = 64, H = 64;
+  srand(8);
+  int W = 128, H = 128;
   printf("W:%d N:%d\n",W,H);
   wk_vector<uint8_t> input(W * H);
   for (int i = 0; i < input.host_data.size(); ++i)
     input.host_data[i] = rand() & 255;
   input.sync_device();
-  wk_vector<float> output(W * H);
+  wk_vector<float> output_reg(W * H),output_occ(W * H);
   const int BLOCK_DIM_X = 128;
   
   WuK_Timer("entropy_with_register_spiling", [&] {
     entropy_with_register_spiling<BLOCK_DIM_X>
         <<<dim3((W + BLOCK_DIM_X - 1) / BLOCK_DIM_X, H, 1), BLOCK_DIM_X>>>(
-            W, H, input.device_data, output.device_data);
+            W, H, input.device_data, output_reg.device_data);
   },1);
   
   
   WuK_Timer("entropy_with_low_occupancy", [&] {
     entropy_with_low_occupancy<BLOCK_DIM_X>
         <<<dim3((W + BLOCK_DIM_X - 1) / BLOCK_DIM_X, H, 1), BLOCK_DIM_X>>>(
-            W, H, input.device_data, output.device_data);
+            W, H, input.device_data, output_occ.device_data);
   },1);
   
-  output.sync_host();
+  output_reg.sync_host();
+  output_occ.sync_host();
+
+  return check<float>(output_occ,output_reg);
 }

@@ -200,5 +200,5 @@ void benchmark(int M,int N,bool ifcheck=1){
 }
 
 int main(){
-    benchmark<double,double,65,65>(256,256,1);
+    benchmark<double,double,31,31>(128,128,1);
 }
