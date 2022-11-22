@@ -1,0 +1,41 @@
+CURPATH=$(pwd)
+if which java > /dev/null ; [ $? -ne 0 ]
+then
+    echo "please setup java environment first!"
+    return
+fi
+
+if which cmake > /dev/null ; [ $? -ne 0 ]
+then
+    echo "please setup cmake environment first!"
+    return
+fi
+
+if [ ! -n "$CUDA_PATH" ]
+then
+    echo "please setup CUDA environment(CUDA_PATH) first!"
+    return
+fi
+
+if [ ! -n "$PTX_EMU_SETUP" ]
+then 
+    export PATH=${CUDA_PATH}/bin:${PATH}
+    export CLASSPATH=".:$(pwd)/antlr4/antlr-4.11.1-complete.jar:$CLASSPATH"
+
+    alias antlr4='java -Xmx500M -cp "$CLASSPATH" org.antlr.v4.Tool'
+    alias grun='java -Xmx500M -cp "$CLASSPATH" org.antlr.v4.gui.TestRig'
+    export PTX_EMU_SETUP=1
+    export PTX_EMU_PATH=$(pwd)
+
+    if [ ! -d ${PTX_EMU_PATH}/antlr4/antlr4-cpp-runtime-4.11.1-source/run/usr/local/lib ]
+    then
+        . antlr4/build_cpp_runtime.sh
+    fi
+    export LD_LIBRARY_PATH=${PTX_EMU_PATH}/antlr4/antlr4-cpp-runtime-4.11.1-source/run/usr/local/lib:${PTX_EMU_PATH}/lib:$LD_LIBRARY_PATH
+    
+    cd ${PTX_EMU_PATH}
+    make lib
+    make minitest
+    
+fi
+

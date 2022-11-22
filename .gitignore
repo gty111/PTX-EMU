@@ -4,3 +4,5 @@
 **/.vscode
 **/.antlr
 **/log
+**/run
+**/*.ptx
