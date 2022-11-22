@@ -41,7 +41,9 @@ void** __cudaRegisterFatBinary(
     void *fatCubin
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
 
     static bool if_executed = 0;
 
@@ -52,14 +54,18 @@ void** __cudaRegisterFatBinary(
         long size = readlink("/proc/self/exe",self_exe_path,1024);
         assert(size!=-1);
         self_exe_path[size] = '\0';
+        #ifdef LOGEMU
         printf("EMU: self exe links to %s\n",self_exe_path);
+        #endif
 
         // get ptx file name embedded in binary
         char cmd[1024] = "";
         snprintf(cmd,1024,"cuobjdump -lptx %s | cut -d : -f 2 | awk '{$1=$1}1' > %s",
             self_exe_path,"__ptx_list__");
         if(system(cmd)!=0){
+            #ifdef LOGEMU
             printf("EMU: fail to execute %s\n",cmd);
+            #endif
             exit(0);
         }
 
@@ -67,11 +73,15 @@ void** __cudaRegisterFatBinary(
         std::ifstream infile("__ptx_list__");
         std::string ptx_file;
         while(std::getline(infile,ptx_file)){
+            #ifdef LOGEMU
             printf("EMU: extract PTX file %s \n",ptx_file.c_str());
+            #endif
             snprintf(cmd,1024,"cuobjdump -xptx %s %s >/dev/null",ptx_file.c_str(),
                 self_exe_path);
             if(system(cmd)!=0){
+                #ifdef LOGEMU
                 printf("EMU: fail to execute %s\n",cmd);
+                #endif
                 exit(0);
             }
             std::ifstream if_ptx(ptx_file);
@@ -110,11 +120,13 @@ void __cudaRegisterFunction(
         dim3    *gDim,
         int     *wSize
 )
-{
+{   
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
     printf("EMU: hostFun %p\n",hostFun);
     printf("EMU: deviceFun %p\n",deviceFun);
     printf("EMU: deviceFunName %s\n",deviceName);
+    #endif
     func2name[(uint64_t)hostFun] = *(new std::string(deviceName));
 }
 
@@ -122,7 +134,9 @@ void __cudaRegisterFatBinaryEnd(
     void **fatCubinHandle
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
 }
 
 cudaError_t cudaMalloc(
@@ -132,7 +146,9 @@ cudaError_t cudaMalloc(
 {
     *p = malloc(s);
     memAlloc[(uint64_t)p] = 1;
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -143,9 +159,11 @@ cudaError_t cudaMemcpy(
     enum cudaMemcpyKind kind
 )
 {
-    printf("EMU: memcpy dst:%p src:%p\n",dst,src);
     memcpy(dst,src,count);
+    #ifdef LOGEMU
+    printf("EMU: memcpy dst:%p src:%p\n",dst,src);
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -154,7 +172,9 @@ cudaError_t cudaEventCreate(
     unsigned int  flags
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -163,7 +183,9 @@ cudaError_t cudaEventRecord(
     cudaStream_t stream
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -174,9 +196,11 @@ unsigned __cudaPushCallConfiguration(
     struct CUstream_st *stream = 0 // temporily ignore stream
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
     printf("EMU: gridDim(%d,%d,%d)\n",gridDim.x,gridDim.y,gridDim.z);
     printf("EMU: blockDim(%d,%d,%d)\n",blockDim.x,blockDim.y,blockDim.z);
+    #endif
     _gridDim = gridDim;
     _blockDim = blockDim;
     _sharedMem = sharedMem;
@@ -187,7 +211,9 @@ cudaError_t cudaEventSynchronize(
     cudaEvent_t event
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -197,7 +223,9 @@ cudaError_t cudaEventElapsedTime(
     cudaEvent_t  end
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -210,7 +238,9 @@ cudaError_t cudaFree(
         free(devPtr);
         memAlloc[(uint64_t)devPtr] = 0;
     }
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -218,7 +248,9 @@ void __cudaUnregisterFatBinary(
     void **fatCubinHandle
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
 }
 
 cudaError_t __cudaPopCallConfiguration(
@@ -231,7 +263,9 @@ cudaError_t __cudaPopCallConfiguration(
     *gridDim = _gridDim;
     *blockDim = _blockDim;
     *sharedMem = _sharedMem;
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -248,11 +282,11 @@ cudaError_t cudaLaunchKernel(
 
     ptxInterpreter.launchPtxInterpreter(ptxListener.ptxContext,
         func2name[(uint64_t)func],args,gridDim,blockDim);
-
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
-    //printf("%s\n",ptx_buffer.c_str());
     printf("EMU: deviceFunName %s\n",func2name[(uint64_t)func].c_str());
     printf("EMU: arg %p\n",args);
+    #endif
 
     return cudaSuccess;
 }
@@ -268,7 +302,9 @@ void __cudaRegisterVar(
     int         global
 ) 
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
 }
 
 cudaError_t cudaMallocManaged ( 
@@ -279,7 +315,9 @@ cudaError_t cudaMallocManaged (
 {
     *devPtr = malloc(size);
     memAlloc[(uint64_t)devPtr] = 1;
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -287,7 +325,9 @@ cudaError_t cudaDeviceSynchronize (
     void
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -298,7 +338,9 @@ cudaError_t cudaMemset (
 )
 {
     memset(devPtr,value,count);
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -306,7 +348,9 @@ cudaError_t cudaGetLastError (
     void 
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -317,7 +361,9 @@ cudaError_t cudaMemsetAsync (
     cudaStream_t stream = 0 
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 
@@ -325,7 +371,9 @@ cudaError_t cudaPeekAtLastError (
     void 
 )
 {
+    #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 

@@ -113,6 +113,48 @@ class PtxInterpreter{
             this->state = RUN;
         }
 
+        void dLog(){
+            std::printf("INTE: BlockIdx(%d,%d,%d) ThreadIdx(%d,%d,%d)\n",
+                BlockIdx.x,BlockIdx.y,BlockIdx.z,
+                ThreadIdx.x,ThreadIdx.y,ThreadIdx.z);
+            std::printf("PC:%d\n",pc);
+            int toti = 0;
+            for(auto &e:name2Reg){
+                auto ee = e.second;
+                void *base = ee->addr;
+                for(int i=0;i<ee->elementNum;i++,toti++){
+                    switch(ee->name[0]){
+                    case 'r': case 'S':
+                    switch(ee->byteNum){
+                    case 2:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
+                        *(uint16_t*)((uint64_t)base+i*ee->byteNum));break;
+                    case 4:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
+                        *(uint32_t*)((uint64_t)base+i*ee->byteNum));break;
+                    case 8:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
+                        *(uint64_t*)((uint64_t)base+i*ee->byteNum));break;
+                    default:assert(0);
+                    }
+                    break;
+                    case 'f':
+                    switch(ee->byteNum){
+                    case 4:std::printf("%5s%-3d:%-16f ",ee->name.c_str(),i,
+                        *(float*)((uint64_t)base+i*ee->byteNum));break;
+                    case 8:std::printf("%5s%-3d:%-16lf ",ee->name.c_str(),i,
+                        *(double*)((uint64_t)base+i*ee->byteNum));break;
+                    default: assert(0);
+                    }
+                    break;
+                    case 'p':
+                    std::printf("%5s%-3d:%-16d ",ee->name.c_str(),i,
+                        *(uint8_t*)((uint64_t)base+i*ee->byteNum));break;
+                    default:assert(0);
+                    }
+                    if((toti+1)%6==0)std::printf("\n");
+                }
+            }
+            std::printf("\n");
+        }
+
         EXE_STATE exe_once(){
             if(state==RUN){
                 pc++;
@@ -123,45 +165,7 @@ class PtxInterpreter{
                 #endif
                 _exe_once(s);
                 #ifdef LOGINTE
-                std::printf("INTE: BlockIdx(%d,%d,%d) ThreadIdx(%d,%d,%d)\n",
-                    BlockIdx.x,BlockIdx.y,BlockIdx.z,
-                    ThreadIdx.x,ThreadIdx.y,ThreadIdx.z);
-                std::printf("PC:%d\n",pc);
-                int toti = 0;
-                for(auto &e:name2Reg){
-                    auto ee = e.second;
-                    void *base = ee->addr;
-                    for(int i=0;i<ee->elementNum;i++,toti++){
-                        switch(ee->name[0]){
-                        case 'r': case 'S':
-                        switch(ee->byteNum){
-                        case 2:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
-                            *(uint16_t*)((uint64_t)base+i*ee->byteNum));break;
-                        case 4:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
-                            *(uint32_t*)((uint64_t)base+i*ee->byteNum));break;
-                        case 8:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
-                            *(uint64_t*)((uint64_t)base+i*ee->byteNum));break;
-                        default:assert(0);
-                        }
-                        break;
-                        case 'f':
-                        switch(ee->byteNum){
-                        case 4:std::printf("%5s%-3d:%-16f ",ee->name.c_str(),i,
-                            *(float*)((uint64_t)base+i*ee->byteNum));break;
-                        case 8:std::printf("%5s%-3d:%-16lf ",ee->name.c_str(),i,
-                            *(double*)((uint64_t)base+i*ee->byteNum));break;
-                        default: assert(0);
-                        }
-                        break;
-                        case 'p':
-                        std::printf("%5s%-3d:%-16d ",ee->name.c_str(),i,
-                            *(uint8_t*)((uint64_t)base+i*ee->byteNum));break;
-                        default:assert(0);
-                        }
-                        if((toti+1)%6==0)std::printf("\n");
-                    }
-                }
-                std::printf("\n");
+                dLog();
                 #endif
             }
             return state;
@@ -281,7 +285,27 @@ class PtxInterpreter{
                 }
 
                 // exe ld
-                mov(from,to,ss->ldQualifier);
+                if(QvecHasQ(ss->ldQualifier,Q_V2)){
+                    uint64_t step = getBytes(ss->ldQualifier);
+                    auto vecAddr = this->vec.front()->vec;
+                    this->vec.pop();
+                    assert(vecAddr.size()==2);
+                    for(int i=0;i<2;i++){
+                        to = vecAddr[i];
+                        mov((void*)((uint64_t)from+i*step),to,ss->ldQualifier);
+                    }
+                }else if(QvecHasQ(ss->ldQualifier,Q_V4)){
+                    uint64_t step = getBytes(ss->ldQualifier);
+                    auto vecAddr = this->vec.front()->vec;
+                    this->vec.pop();
+                    assert(vecAddr.size()==4);
+                    for(int i=0;i<4;i++){
+                        to = vecAddr[i];
+                        mov((void*)((uint64_t)from+i*step),to,ss->ldQualifier);
+                    }
+                }else{
+                    mov(from,to,ss->ldQualifier);
+                }
                 return;
             }
             case S_MOV:{
@@ -528,7 +552,16 @@ class PtxInterpreter{
                     assert(vecAddr.size()==4);
                     for(int i=0;i<4;i++){
                         from = vecAddr[i];
-                        mov((void*)((uint64_t)to+i*step),from,ss->stQualifier);
+                        mov(from,(void*)((uint64_t)to+i*step),ss->stQualifier);
+                    }
+                }else if(QvecHasQ(ss->stQualifier,Q_V2)){
+                    uint64_t step = getBytes(ss->stQualifier);
+                    auto vecAddr = this->vec.front()->vec;
+                    this->vec.pop();
+                    assert(vecAddr.size()==2);
+                    for(int i=0;i<2;i++){
+                        from = vecAddr[i];
+                        mov(from,(void*)((uint64_t)to+i*step),ss->stQualifier);
                     }
                 }else{
                     mov(from,to,ss->stQualifier);
