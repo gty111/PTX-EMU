@@ -171,7 +171,7 @@ void initVal(int size,T* arr){
 }
 
 template<typename TIN,typename TOUT,int M_TILE,int N_TILE>
-void benchmark(int M,int N,bool ifcheck=1){
+bool benchmark(int M,int N){
    printf("----------------\n");
    printf("M:%d N:%d M_TILE:%d N_TILE:%d\n",M,N,M_TILE,N_TILE);
 
@@ -189,16 +189,10 @@ void benchmark(int M,int N,bool ifcheck=1){
 
    simple_CONV<TIN,TOUT,M_TILE,N_TILE>(M,N,a,conv,c);
 
-   if(ifcheck && valid<TIN,TOUT,M_TILE,N_TILE>(M,N,a,conv,c,1e-6)){
-      std::printf("check pass\n");
-   }else if(ifcheck){
-      std::printf("check fail\n");
-   }else{
-      std::printf("skip check\n");
-   }
+   return valid<TIN,TOUT,M_TILE,N_TILE>(M,N,a,conv,c,1e-6);
    
 }
 
 int main(){
-    benchmark<double,double,31,31>(128,128,1);
+   return !benchmark<double,double,31,31>(128,128);
 }

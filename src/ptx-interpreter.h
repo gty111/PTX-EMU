@@ -113,6 +113,13 @@ class PtxInterpreter{
             this->state = RUN;
         }
 
+        void log(){
+            std::printf("INTE: BlockIdx(%d,%d,%d) ThreadIdx(%d,%d,%d)\n",
+                BlockIdx.x,BlockIdx.y,BlockIdx.z,
+                ThreadIdx.x,ThreadIdx.y,ThreadIdx.z);
+            std::printf("PC:%d\n",pc);
+        }
+
         void dLog(){
             std::printf("INTE: BlockIdx(%d,%d,%d) ThreadIdx(%d,%d,%d)\n",
                 BlockIdx.x,BlockIdx.y,BlockIdx.z,
@@ -681,20 +688,20 @@ class PtxInterpreter{
                 return;
             }
             case S_ATOM:{
-                assert(0);
-                /* TODO fix all-pairs-distance 
                 auto ss = (StatementContext::ATOM*)s.statement;
 
                 if(QvecHasQ(ss->atomQualifier,Q_DOTADD)){
-                    void *to = getOperandAddr(ss->atomOp[0],ss->atomQualifier);
+                    void *d = getOperandAddr(ss->atomOp[0],ss->atomQualifier);
 
-                    void *op0 = getOperandAddr(ss->atomOp[1],ss->atomQualifier);
+                    void *a = getOperandAddr(ss->atomOp[1],ss->atomQualifier);
 
-                    void *op1 = getOperandAddr(ss->atomOp[2],ss->atomQualifier);
+                    void *b = getOperandAddr(ss->atomOp[2],ss->atomQualifier);
+                    
+                    mov(a,d,ss->atomQualifier); 
 
-                    add(to,op0,op1,ss->atomQualifier);
+                    add(a,a,b,ss->atomQualifier);
                 }else assert(0);
-                */
+        
                 return;
             }
             case S_XOR:{

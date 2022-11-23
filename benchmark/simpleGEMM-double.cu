@@ -186,7 +186,7 @@ void initVal(int size,T* arr){
 }
 
 template<typename TIN,typename TOUT>
-void benchmark(int M,int N,int K,bool ifcheck=1){
+bool benchmark(int M,int N,int K){
    printf("----------------\n");
    printf("M:%d N:%d K:%d\n",M,N,K);
 
@@ -204,16 +204,9 @@ void benchmark(int M,int N,int K,bool ifcheck=1){
 
    simple_GEMM<TIN,TOUT,16,16>(M,N,K,a,b,c);
 
-   if(ifcheck && valid<TIN,TOUT>(M,N,K,a,b,c,1e-6)){
-      std::printf("check pass\n");
-   }else if(ifcheck){
-      std::printf("check fail\n");
-   }else{
-      std::printf("skip check\n");
-   }
-   
+   return valid<TIN,TOUT>(M,N,K,a,b,c,1e-6);
 }
 
 int main(){
-    benchmark<double,double>(128,128,K_DEFAULT,1);
+    return !benchmark<double,double>(128,128,K_DEFAULT);
 }

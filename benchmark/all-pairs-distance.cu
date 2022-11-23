@@ -163,7 +163,7 @@ int main(int argc, char **argv) {
   struct timeval tp;
   struct timezone tzp;
   /* verification result */ 
-  int status;
+  int status_reg,status_share;
 
   /* seed RNG */
   srand(2);
@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
   elapsedTime = stop_cpu - start_cpu;
   printf("CPU time: %f (us)\n",elapsedTime);
 
-  /* TODO FIX atom
+
   elapsedTime = 0; 
   for (int n = 0; n < iterations; n++) {
     // register GPU kernel 
@@ -229,10 +229,10 @@ int main(int argc, char **argv) {
   }
 
   printf("GPU time (w/o shared memory): %f (us)\n", elapsedTime / iterations);
-  status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  if (status != 0) printf("FAIL\n");
+  status_reg = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
+  if (status_reg != 0) printf("FAIL\n");
   else printf("PASS\n");
-  */
+
 
   elapsedTime = 0; 
   for (int n = 0; n < iterations; n++) {
@@ -252,8 +252,8 @@ int main(int argc, char **argv) {
   }
 
   printf("GPU time (w/ shared memory): %f (us)\n", elapsedTime / iterations);
-  status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  if (status != 0) printf("FAIL\n");
+  status_share = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
+  if (status_share != 0) printf("FAIL\n");
   else printf("PASS\n");
 
   free(cpu_distance);
@@ -262,6 +262,6 @@ int main(int argc, char **argv) {
   cudaFree(data_char_device);
   cudaFree(distance_device);
 
-  return status;
+  return status_reg & status_share;
 }
 
