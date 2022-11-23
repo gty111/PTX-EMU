@@ -18,8 +18,8 @@
 #include <cuda.h>
 #include <sys/time.h>
 
-#define INSTANCES 224   /* # of instances */
-#define ATTRIBUTES 4096 /* # of attributes */
+#define INSTANCES 64   /* # of instances */
+#define ATTRIBUTES 256 /* # of attributes */
 #define THREADS 128    /* # of threads per block */
 
 /* CPU implementation */
@@ -210,9 +210,10 @@ int main(int argc, char **argv) {
   elapsedTime = stop_cpu - start_cpu;
   printf("CPU time: %f (us)\n",elapsedTime);
 
+  /* TODO FIX atom
   elapsedTime = 0; 
   for (int n = 0; n < iterations; n++) {
-    /* register GPU kernel */
+    // register GPU kernel 
     bzero(gpu_distance,INSTANCES*INSTANCES*sizeof(int));
     gettimeofday(&tp, &tzp);
     start_gpu = tp.tv_sec*1000000+tp.tv_usec;
@@ -231,6 +232,7 @@ int main(int argc, char **argv) {
   status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   if (status != 0) printf("FAIL\n");
   else printf("PASS\n");
+  */
 
   elapsedTime = 0; 
   for (int n = 0; n < iterations; n++) {

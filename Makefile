@@ -18,7 +18,7 @@ MINITEST = dummy dummy-add dummy-float dummy-grid dummy-mul dummy-sub dummy-cond
 
 TOTTEST = $(MINITEST) simpleGEMM-int simpleGEMM-float simpleGEMM-double \
 		  simpleCONV-int simpleCONV-float simpleCONV-double 2Dentropy \
-		  aligned-types
+		  aligned-types all-pairs-distance
 
 COLOR_RED   = \033[1;31m
 COLOR_GREEN = \033[1;32m

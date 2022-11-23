@@ -206,8 +206,9 @@ class PtxInterpreter{
                 if(SHMEMADDR){
                     assert(share->val >> 32 == SHMEMADDR);
                 }else{
-                    SHMEMADDR = share->val >> 32;
+                    SHMEMADDR = share->val >> 32; // only save high 32 bit
                 }
+                share->val = (share->val << 32) >> 32; // only save low 32 bit
                 (*name2Share)[share->name] = share;
                 return;
             }
@@ -681,6 +682,19 @@ class PtxInterpreter{
             }
             case S_ATOM:{
                 assert(0);
+                /* TODO fix all-pairs-distance 
+                auto ss = (StatementContext::ATOM*)s.statement;
+
+                if(QvecHasQ(ss->atomQualifier,Q_DOTADD)){
+                    void *to = getOperandAddr(ss->atomOp[0],ss->atomQualifier);
+
+                    void *op0 = getOperandAddr(ss->atomOp[1],ss->atomQualifier);
+
+                    void *op1 = getOperandAddr(ss->atomOp[2],ss->atomQualifier);
+
+                    add(to,op0,op1,ss->atomQualifier);
+                }else assert(0);
+                */
                 return;
             }
             case S_XOR:{
@@ -871,7 +885,11 @@ class PtxInterpreter{
                 #ifdef LOGINTE
                 printf("INTE: access %s\n",fa->ID.c_str());
                 #endif
-                ret = (void*)name2Sym[fa->ID]->val;
+                if(name2Sym[fa->ID]){
+                    ret = (void*)name2Sym[fa->ID]->val;
+                }else if((*name2Share)[fa->ID]){
+                    ret = (void*)(*name2Share)[fa->ID]->val;
+                }else assert(0);
             }
             if(fa->offset.size()!=0){
                 setIMM(fa->offset,Q_S64);
