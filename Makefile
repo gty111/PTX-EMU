@@ -6,7 +6,7 @@ LINK_DIR = ${PTX_EMU_PATH}/antlr4/antlr4-cpp-runtime-4.11.1-source/run/usr/local
 ARCH = sm_80
 NVCC_FLARG = -arch=$(ARCH) -use_fast_math -lcudart
 LIB_OUT = libcudart.so.11.0
-CPP_FLAG = -g -std=c++2a -pthread -fPIC -shared -Wl,--version-script=linux-so-version.txt \
+CPP_FLAG = -std=c++2a -pthread -fPIC -shared -Wl,--version-script=linux-so-version.txt \
 	$(SRC)/PTXEMU.cpp $(SRC)/build/*.cpp $(addprefix -I,$(INCLUDE_DIR)) $(addprefix -L,$(LINK_DIR)) \
 	-lantlr4-runtime -o lib/$(LIB_OUT) 
 
@@ -48,11 +48,11 @@ $(TOTTEST):%:bin/%
 lib:
 	$(shell [ ! -d lib ] && mkdir lib)
 	make -C $(SRC)
-	g++ $(CPP_FLAG) 
+	g++ -O3 $(CPP_FLAG) 
 Dlib:
 	$(shell [ ! -d lib ] && mkdir lib)
 	make -C src
-	g++ -D DEBUGINTE -D LOGINTE $(CPP_FLAG)
+	g++ -g -O0 -D DEBUGINTE -D LOGINTE $(CPP_FLAG)
 
 # export LD_LIBRARY_PATH=~/SIM_ON_GPU/lib:$LD_LIBRARY_PATH
 .PHONY: lib Dlib
