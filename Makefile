@@ -18,7 +18,7 @@ MINITEST = dummy dummy-add dummy-float dummy-grid dummy-mul dummy-sub dummy-cond
 
 TOTTEST = $(MINITEST) simpleGEMM-int simpleGEMM-float simpleGEMM-double \
 		  simpleCONV-int simpleCONV-float simpleCONV-double 2Dentropy \
-		  aligned-types all-pairs-distance
+		  aligned-types all-pairs-distance bitonic
 
 COLOR_RED   = \033[1;31m
 COLOR_GREEN = \033[1;32m
@@ -51,7 +51,12 @@ lib:
 	g++ -O3 $(CPP_FLAG) 
 Dlib:
 	$(shell [ ! -d lib ] && mkdir lib)
-	make -C src
+	make -C $(SRC)
+	g++ -g -O0 $(CPP_FLAG)
+
+Slib:
+	$(shell [ ! -d lib ] && mkdir lib)
+	make -C $(SRC)
 	g++ -g -O0 -D DEBUGINTE -D LOGINTE $(CPP_FLAG)
 
 # export LD_LIBRARY_PATH=~/SIM_ON_GPU/lib:$LD_LIBRARY_PATH
