@@ -377,5 +377,15 @@ cudaError_t cudaPeekAtLastError (
     return cudaSuccess;
 }
 
+cudaError_t cudaThreadSynchronize ( 
+    void 
+)
+{
+    #ifdef LOGEMU
+    printf("EMU: call %s\n",__my_func__);
+    #endif
+    return cudaSuccess;
+}
+
 } // end of extern "C"
 

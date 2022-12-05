@@ -168,6 +168,7 @@ class PtxInterpreter{
                 assert(pc>=0 && pc<(*statements).size());
                 auto s = (*statements)[pc];
                 #ifdef DEBUGINTE
+                printf("PRESS ENTER...\n");
                 getchar();
                 #endif
                 _exe_once(s);
@@ -684,7 +685,16 @@ class PtxInterpreter{
                 return;
             }
             case S_EX2:{
-                assert(0);
+                auto ss = (StatementContext::EX2*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->ex2Op[0],ss->ex2Qualifier);
+
+                // op1
+                void *op = getOperandAddr(ss->ex2Op[1],ss->ex2Qualifier);
+
+                // exe lg2
+                ex2(to,op,ss->ex2Qualifier);
                 return;
             }
             case S_ATOM:{
@@ -951,6 +961,17 @@ class PtxInterpreter{
                     return this->GridDim.z;
                 }else assert(0);
             }else assert(0);
+        }
+
+        template<typename T>
+        void _ex2(void *to,void *op){
+            *(T*)to = std::pow(2,*(T*)op);
+        }
+
+        void ex2(void *to,void *op,std::vector<Qualifier>&q){
+            Qualifier datatype = getDataType(q);
+            assert(datatype==Q_F32);
+            _ex2<float>(to,op);
         }
 
         template<typename T>
@@ -1246,7 +1267,7 @@ class PtxInterpreter{
             for(auto e:q){
                 switch(e){
                 case Q_EQ:case Q_NE:case Q_LT:case Q_LE:case Q_GT:
-                case Q_GE:case Q_LO:case Q_HI:
+                case Q_GE:case Q_LO:case Q_HI:case Q_LTU:
                 return e;
                 }
             }
@@ -1335,6 +1356,50 @@ class PtxInterpreter{
                 case 8:{
                     assert(dtype==DINT);
                     _setp_ne<uint64_t>(to,op0,op1);
+                    return;
+                }
+                default:assert(0);
+                }
+                return;
+            }
+            case Q_LTU:{
+                switch(len){
+                case 1: {
+                    assert(dtype==DINT);
+                    if(Signed(datatype))
+                        _setp_lt<int8_t>(to,op0,op1);
+                    else 
+                        _setp_lt<uint8_t>(to,op0,op1);
+                    return;
+                }
+                case 2:{
+                    assert(dtype==DINT);
+                    if(Signed(datatype))
+                        _setp_lt<int16_t>(to,op0,op1);
+                    else 
+                        _setp_lt<uint16_t>(to,op0,op1);
+                    return;
+                }
+                case 4:{
+                    if(dtype==DFLOAT){
+                        _setp_lt<float>(to,op0,op1);
+                    }else if(dtype==DINT){
+                        if(Signed(datatype))
+                            _setp_lt<int32_t>(to,op0,op1);
+                        else
+                            _setp_lt<uint32_t>(to,op0,op1);
+                    }else assert(0);
+                    return;
+                }
+                case 8:{
+                    if(dtype==DFLOAT){
+                        _setp_lt<double>(to,op0,op1);
+                    }else if(dtype==DINT){
+                        if(Signed(datatype))
+                            _setp_lt<int64_t>(to,op0,op1);
+                        else
+                            _setp_lt<uint64_t>(to,op0,op1);
+                    }else assert(0);
                     return;
                 }
                 default:assert(0);
@@ -1436,19 +1501,25 @@ class PtxInterpreter{
                     return;
                 }
                 case 4:{
-                    assert(dtype==DINT);
-                    if(Signed(datatype))
-                        _setp_ge<int32_t>(to,op0,op1);
-                    else
-                        _setp_ge<uint32_t>(to,op0,op1);
+                    if(dtype==DFLOAT){
+                        _setp_ge<float>(to,op0,op1);
+                    }else if(dtype==DINT){
+                        if(Signed(datatype))
+                            _setp_ge<int32_t>(to,op0,op1);
+                        else
+                            _setp_ge<uint32_t>(to,op0,op1);
+                    }else assert(0);
                     return;
                 }
                 case 8:{
-                    assert(dtype==DINT);
-                    if(Signed(datatype))
-                        _setp_ge<int64_t>(to,op0,op1);
-                    else
-                        _setp_ge<uint64_t>(to,op0,op1);
+                    if(dtype==DFLOAT){
+                        _setp_ge<double>(to,op0,op1);
+                    }else if(dtype==DINT){
+                        if(Signed(datatype))
+                            _setp_ge<int64_t>(to,op0,op1);
+                        else
+                            _setp_ge<uint64_t>(to,op0,op1);
+                    }else assert(0);
                     return;
                 }
                 default:assert(0);
