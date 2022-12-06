@@ -1,4 +1,4 @@
-option(ANTLR_BUILD_CPP_TESTS "Build C++ tests." ON)
+option(ANTLR_BUILD_CPP_TESTS "Build C++ tests." OFF)
 
 include_directories(
   ${PROJECT_SOURCE_DIR}/runtime/src

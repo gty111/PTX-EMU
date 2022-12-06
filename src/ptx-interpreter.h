@@ -1418,28 +1418,43 @@ class PtxInterpreter{
         }
 
         template<typename T>
-        void _setp_ne(void *to,void *op0,void *op1){
-            *(uint8_t*)to = *(T*)op0 != *(T*)op1;
+        void _setp_ne(void *to,void *op0,void *op1,bool mask){
+            if(*(T*)op0 != *(T*)op0 || *(T*)op1 != *(T*)op1)
+                *(uint8_t*)to = mask;
+            else 
+                *(uint8_t*)to = *(T*)op0 != *(T*)op1;
         }
 
         template<typename T>
-        void _setp_lt(void *to,void *op0,void *op1){
-            *(uint8_t*)to = *(T*)op0 < *(T*)op1;
+        void _setp_lt(void *to,void *op0,void *op1,bool mask){
+            if(*(T*)op0 != *(T*)op0 || *(T*)op1 != *(T*)op1)
+                *(uint8_t*)to = mask;
+            else 
+                *(uint8_t*)to = *(T*)op0 < *(T*)op1;
         }
 
         template<typename T>
-        void _setp_le(void *to,void *op0,void *op1){
-            *(uint8_t*)to = *(T*)op0 <= *(T*)op1;
+        void _setp_le(void *to,void *op0,void *op1,bool mask){
+            if(*(T*)op0 != *(T*)op0 || *(T*)op1 != *(T*)op1)
+                *(uint8_t*)to = mask;
+            else 
+                *(uint8_t*)to = *(T*)op0 <= *(T*)op1;
         }
 
         template<typename T>
-        void _setp_ge(void *to,void *op0,void *op1){
-            *(uint8_t*)to = *(T*)op0 >= *(T*)op1;
+        void _setp_ge(void *to,void *op0,void *op1,bool mask){
+            if(*(T*)op0 != *(T*)op0 || *(T*)op1 != *(T*)op1)
+                *(uint8_t*)to = mask;
+            else 
+                *(uint8_t*)to = *(T*)op0 >= *(T*)op1;
         }
 
         template<typename T>
-        void _setp_gt(void *to,void *op0,void *op1){
-            *(uint8_t*)to = *(T*)op0 > *(T*)op1;
+        void _setp_gt(void *to,void *op0,void *op1,bool mask){
+            if(*(T*)op0 != *(T*)op0 || *(T*)op1 != *(T*)op1)
+                *(uint8_t*)to = mask;
+            else 
+                *(uint8_t*)to = *(T*)op0 > *(T*)op1;
         }
 
         void setp(void *to,void *op0,void *op1,std::vector<Qualifier>&q){
@@ -1479,22 +1494,28 @@ class PtxInterpreter{
                 switch(len){
                 case 1: {
                     assert(dtype==DINT);
-                    _setp_ne<uint8_t>(to,op0,op1);
+                    _setp_ne<uint8_t>(to,op0,op1,cmpOp==Q_NEU);
                     return;
                 }
                 case 2:{
                     assert(dtype==DINT);
-                    _setp_ne<uint16_t>(to,op0,op1);
+                    _setp_ne<uint16_t>(to,op0,op1,cmpOp==Q_NEU);
                     return;
                 }
                 case 4:{
-                    //assert(dtype==DINT); TODO float comp
-                    _setp_ne<uint32_t>(to,op0,op1);
+                    if(dtype==DINT)
+                        _setp_ne<uint32_t>(to,op0,op1,cmpOp==Q_NEU);
+                    else if(dtype==DFLOAT)
+                        _setp_ne<float>(to,op0,op1,cmpOp==Q_NEU);
+                    else assert(0);
                     return;
                 }
                 case 8:{
-                    //assert(dtype==DINT); TODO double comp
-                    _setp_ne<uint64_t>(to,op0,op1);
+                    if(dtype==DINT)
+                        _setp_ne<uint64_t>(to,op0,op1,cmpOp==Q_NEU);
+                    else if(dtype==DFLOAT)
+                        _setp_ne<double>(to,op0,op1,cmpOp==Q_NEU);
+                    else assert(0);
                     return;
                 }
                 default:assert(0);
@@ -1507,38 +1528,38 @@ class PtxInterpreter{
                 case 1: {
                     assert(dtype==DINT);
                     if(Signed(datatype))
-                        _setp_lt<int8_t>(to,op0,op1);
+                        _setp_lt<int8_t>(to,op0,op1,cmpOp==Q_LTU);
                     else 
-                        _setp_lt<uint8_t>(to,op0,op1);
+                        _setp_lt<uint8_t>(to,op0,op1,cmpOp==Q_LTU);
                     return;
                 }
                 case 2:{
                     assert(dtype==DINT);
                     if(Signed(datatype))
-                        _setp_lt<int16_t>(to,op0,op1);
+                        _setp_lt<int16_t>(to,op0,op1,cmpOp==Q_LTU);
                     else 
-                        _setp_lt<uint16_t>(to,op0,op1);
+                        _setp_lt<uint16_t>(to,op0,op1,cmpOp==Q_LTU);
                     return;
                 }
                 case 4:{
                     if(dtype==DFLOAT){
-                        _setp_lt<float>(to,op0,op1);
+                        _setp_lt<float>(to,op0,op1,cmpOp==Q_LTU);
                     }else if(dtype==DINT){
                         if(Signed(datatype))
-                            _setp_lt<int32_t>(to,op0,op1);
+                            _setp_lt<int32_t>(to,op0,op1,cmpOp==Q_LTU);
                         else
-                            _setp_lt<uint32_t>(to,op0,op1);
+                            _setp_lt<uint32_t>(to,op0,op1,cmpOp==Q_LTU);
                     }else assert(0);
                     return;
                 }
                 case 8:{
                     if(dtype==DFLOAT){
-                        _setp_lt<double>(to,op0,op1);
+                        _setp_lt<double>(to,op0,op1,cmpOp==Q_LTU);
                     }else if(dtype==DINT){
                         if(Signed(datatype))
-                            _setp_lt<int64_t>(to,op0,op1);
+                            _setp_lt<int64_t>(to,op0,op1,cmpOp==Q_LTU);
                         else
-                            _setp_lt<uint64_t>(to,op0,op1);
+                            _setp_lt<uint64_t>(to,op0,op1,cmpOp==Q_LTU);
                     }else assert(0);
                 }
                 default:assert(0);
@@ -1551,38 +1572,38 @@ class PtxInterpreter{
                 case 1: {
                     assert(dtype==DINT);
                     if(Signed(datatype))
-                        _setp_le<int8_t>(to,op0,op1);
+                        _setp_le<int8_t>(to,op0,op1,cmpOp==Q_LEU);
                     else 
-                        _setp_le<uint8_t>(to,op0,op1);
+                        _setp_le<uint8_t>(to,op0,op1,cmpOp==Q_LEU);
                     return;
                 }
                 case 2:{
                     assert(dtype==DINT);
                     if(Signed(datatype))
-                        _setp_le<int16_t>(to,op0,op1);
+                        _setp_le<int16_t>(to,op0,op1,cmpOp==Q_LEU);
                     else 
-                        _setp_le<uint16_t>(to,op0,op1);
+                        _setp_le<uint16_t>(to,op0,op1,cmpOp==Q_LEU);
                     return;
                 }
                 case 4:{
                     if(dtype==DFLOAT){
-                        _setp_le<float>(to,op0,op1);
+                        _setp_le<float>(to,op0,op1,cmpOp==Q_LEU);
                     }else if(dtype==DINT){
                         if(Signed(datatype))
-                            _setp_le<int32_t>(to,op0,op1);
+                            _setp_le<int32_t>(to,op0,op1,cmpOp==Q_LEU);
                         else
-                            _setp_le<uint32_t>(to,op0,op1);
+                            _setp_le<uint32_t>(to,op0,op1,cmpOp==Q_LEU);
                     }else assert(0);
                     return;
                 }
                 case 8:{
                     if(dtype==DFLOAT){
-                        _setp_le<double>(to,op0,op1);
+                        _setp_le<double>(to,op0,op1,cmpOp==Q_LEU);
                     }else if(dtype==DINT){
                         if(Signed(datatype))
-                            _setp_le<int64_t>(to,op0,op1);
+                            _setp_le<int64_t>(to,op0,op1,cmpOp==Q_LEU);
                         else
-                            _setp_le<uint64_t>(to,op0,op1);
+                            _setp_le<uint64_t>(to,op0,op1,cmpOp==Q_LEU);
                     }else assert(0);
                     return;
                 }
@@ -1596,38 +1617,38 @@ class PtxInterpreter{
                 case 1: {
                     assert(dtype==DINT);
                     if(Signed(datatype))
-                        _setp_ge<int8_t>(to,op0,op1);
+                        _setp_ge<int8_t>(to,op0,op1,cmpOp==Q_GEU);
                     else 
-                        _setp_ge<uint8_t>(to,op0,op1);
+                        _setp_ge<uint8_t>(to,op0,op1,cmpOp==Q_GEU);
                     return;
                 }
                 case 2:{
                     assert(dtype==DINT);
                     if(Signed(datatype))
-                        _setp_ge<int16_t>(to,op0,op1);
+                        _setp_ge<int16_t>(to,op0,op1,cmpOp==Q_GEU);
                     else 
-                        _setp_ge<uint16_t>(to,op0,op1);
+                        _setp_ge<uint16_t>(to,op0,op1,cmpOp==Q_GEU);
                     return;
                 }
                 case 4:{
                     if(dtype==DFLOAT){
-                        _setp_ge<float>(to,op0,op1);
+                        _setp_ge<float>(to,op0,op1,cmpOp==Q_GEU);
                     }else if(dtype==DINT){
                         if(Signed(datatype))
-                            _setp_ge<int32_t>(to,op0,op1);
+                            _setp_ge<int32_t>(to,op0,op1,cmpOp==Q_GEU);
                         else
-                            _setp_ge<uint32_t>(to,op0,op1);
+                            _setp_ge<uint32_t>(to,op0,op1,cmpOp==Q_GEU);
                     }else assert(0);
                     return;
                 }
                 case 8:{
                     if(dtype==DFLOAT){
-                        _setp_ge<double>(to,op0,op1);
+                        _setp_ge<double>(to,op0,op1,cmpOp==Q_GEU);
                     }else if(dtype==DINT){
                         if(Signed(datatype))
-                            _setp_ge<int64_t>(to,op0,op1);
+                            _setp_ge<int64_t>(to,op0,op1,cmpOp==Q_GEU);
                         else
-                            _setp_ge<uint64_t>(to,op0,op1);
+                            _setp_ge<uint64_t>(to,op0,op1,cmpOp==Q_GEU);
                     }else assert(0);
                     return;
                 }
@@ -1641,38 +1662,38 @@ class PtxInterpreter{
                 case 1: {
                     assert(dtype==DINT);
                     if(Signed(datatype))
-                        _setp_gt<int8_t>(to,op0,op1);
+                        _setp_gt<int8_t>(to,op0,op1,cmpOp==Q_GTU);
                     else 
-                        _setp_gt<uint8_t>(to,op0,op1);
+                        _setp_gt<uint8_t>(to,op0,op1,cmpOp==Q_GTU);
                     return;
                 }
                 case 2:{
                     assert(dtype==DINT);
                     if(Signed(datatype))
-                        _setp_gt<int16_t>(to,op0,op1);
+                        _setp_gt<int16_t>(to,op0,op1,cmpOp==Q_GTU);
                     else 
-                        _setp_gt<uint16_t>(to,op0,op1);
+                        _setp_gt<uint16_t>(to,op0,op1,cmpOp==Q_GTU);
                     return;
                 }
                 case 4:{
                     if(dtype==DFLOAT){
-                        _setp_gt<float>(to,op0,op1);
+                        _setp_gt<float>(to,op0,op1,cmpOp==Q_GTU);
                     }else if(dtype==DINT){
                         if(Signed(datatype))
-                            _setp_gt<int32_t>(to,op0,op1);
+                            _setp_gt<int32_t>(to,op0,op1,cmpOp==Q_GTU);
                         else
-                            _setp_gt<uint32_t>(to,op0,op1);
+                            _setp_gt<uint32_t>(to,op0,op1,cmpOp==Q_GTU);
                     }else assert(0);
                     return;
                 }
                 case 8:{
                     if(dtype==DFLOAT){
-                        _setp_gt<double>(to,op0,op1);
+                        _setp_gt<double>(to,op0,op1,cmpOp==Q_GTU);
                     }else if(dtype==DINT){
                         if(Signed(datatype))
-                            _setp_gt<int64_t>(to,op0,op1);
+                            _setp_gt<int64_t>(to,op0,op1,cmpOp==Q_GTU);
                         else
-                            _setp_gt<uint64_t>(to,op0,op1);
+                            _setp_gt<uint64_t>(to,op0,op1,cmpOp==Q_GTU);
                     }else assert(0);
                     return;
                 }
