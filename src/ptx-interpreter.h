@@ -37,6 +37,10 @@ int Q2bytes(Qualifier &q){
 
 uint64_t SHMEMADDR = 0; // log SHMEMADDR high 32bits
 
+#ifdef DEBUGINTE
+bool sync_thread = 0;
+#endif
+
 class PtxInterpreter{
   public:
     PtxContext *ptxContext;
@@ -117,6 +121,9 @@ class PtxInterpreter{
         }
 
         void log(){
+            std::printf("INTE: GridDim(%d,%d,%d) BlockDim(%d,%d,%d)\n",
+                GridDim.x,GridDim.y,GridDim.z,
+                BlockDim.x,BlockDim.y,BlockDim.z);
             std::printf("INTE: BlockIdx(%d,%d,%d) ThreadIdx(%d,%d,%d)\n",
                 BlockIdx.x,BlockIdx.y,BlockIdx.z,
                 ThreadIdx.x,ThreadIdx.y,ThreadIdx.z);
@@ -124,13 +131,14 @@ class PtxInterpreter{
         }
 
         void dLog(){
-            std::printf("INTE: BlockIdx(%d,%d,%d) ThreadIdx(%d,%d,%d)\n",
-                BlockIdx.x,BlockIdx.y,BlockIdx.z,
-                ThreadIdx.x,ThreadIdx.y,ThreadIdx.z);
-            std::printf("PC:%d\n",pc);
+            // std::printf("INTE: BlockIdx(%d,%d,%d) ThreadIdx(%d,%d,%d)\n",
+            //     BlockIdx.x,BlockIdx.y,BlockIdx.z,
+            //     ThreadIdx.x,ThreadIdx.y,ThreadIdx.z);
+            // std::printf("PC:%d\n",pc);
             int toti = 0;
             for(auto &e:name2Reg){
                 auto ee = e.second;
+                if(!ee)continue;
                 void *base = ee->addr;
                 for(int i=0;i<ee->elementNum;i++,toti++){
                     switch(ee->name[0]){
@@ -167,6 +175,9 @@ class PtxInterpreter{
 
         void printReg(std::string &name,int i){
             auto ee = name2Reg[name];
+            if(i>=ee->elementNum||i<0){
+                printf("out of index\n");
+            }
             void *base = name2Reg[name]->addr;
             switch(ee->name[0]){
             case 'r': case 'S':
@@ -197,38 +208,74 @@ class PtxInterpreter{
             std::printf("\n");
         }
 
+        #ifdef DEBUGINTE
+        void debugMode(){
+            std::string cmd,name;
+            int i;
+            char input[256];
+            while(state==RUN&&!sync_thread){
+                std::cout << ">>> ";
+                std::cin.getline(input,255);
+                if(input[0]=='s'||input[0]=='\0'){
+                    int steps = 1;
+                    if(strlen(input)!=1){
+                        if(sscanf(input,"s %d",&steps)!=1){
+                            steps = 1;
+                        }
+                    }
+                    for(int i=0;i<steps;i++){
+                        _exe_once();
+                        if(state==RUN)pc++;
+                        else break;
+                    }
+                    
+                }else if(strcmp(input,"log")==0){
+                    log();
+                }else if(strcmp(input,"reg")==0){
+                    dLog();
+                }else if(strcmp(input,"q")==0){
+                    exit(0);
+                }else if(strcmp(input,"Sync")==0){
+                    sync_thread = 1;
+                    pc --;
+                }else if(strcmp(input,"h")==0){
+                    printf( "s [steps]:exe steps\n"
+                            "log:print current thread index\n"
+                            "reg:print reg info\n"
+                            "h:get help info\n"
+                            "[reg]:(eg. rd16)print spec reg info\n"
+                            "Sync:run util all threads at bar\n");
+                }else {
+                    cmd = input;
+                    extractREG(cmd,i,name);
+                    if(name2Reg[name]){
+                        printReg(name,i);
+                    }else
+                        std::cout << "unrecognized " << cmd << std::endl;
+                }
+            }
+        }
+        #endif
+
         EXE_STATE exe_once(){
             if(state==RUN){
                 pc++;
-                assert(pc>=0 && pc<(*statements).size());
-                auto s = (*statements)[pc];
                 #ifdef DEBUGINTE
-                std::string cmd,name;
-                int i;
-                while(1){
-                    std::cout << ">>> ";
-                    std::cin >> cmd;
-                    if(cmd=="s"){
-                        _exe_once(s);
-                        break;
-                    }else {
-                        extractREG(cmd,i,name);
-                        if(name2Reg[name]){
-                            printReg(name,i);
-                        }else
-                            std::cout << "unrecognized " << cmd << std::endl;
-                    }
-                }
-                
+                if(!sync_thread)
+                    debugMode();
+                else
+                    _exe_once();
                 #endif
                 #ifndef DEBUGINTE
-                _exe_once(s);
+                _exe_once();
                 #endif
             }
             return state;
         }
 
-        void _exe_once(StatementContext &s){
+        void _exe_once(){
+            assert(pc>=0 && pc<(*statements).size());
+            auto s = (*statements)[pc];
             #ifdef LOGINTE
             std::printf("INTE: %s\n",S2s(s.statementType).c_str());
             #endif
@@ -2144,6 +2191,9 @@ class PtxInterpreter{
                     barThread[i] = 0;
                 }
                 barThreadNum = 0;
+                #ifdef DEBUGINTE
+                sync_thread = 0;
+                #endif
             }
             EXE_STATE state = thread[curExeThreadId].exe_once();
             if(state!=RUN){
