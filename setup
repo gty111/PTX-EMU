@@ -11,7 +11,7 @@ then
     return
 fi
 
-if [ ! -n "$CUDA_PATH" ]
+if [ ! -n "$CUDA_PATH" ] && which nvcc > /dev/null ; [ $? -ne 0 ]
 then
     echo "please setup CUDA environment(CUDA_PATH) first!"
     return
