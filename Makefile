@@ -17,7 +17,7 @@ MINITEST = dummy dummy-add dummy-float dummy-grid dummy-mul dummy-sub dummy-cond
 
 TOTTEST = $(MINITEST) simpleGEMM-int simpleGEMM-float simpleGEMM-double \
 		  simpleCONV-int simpleCONV-float simpleCONV-double 2Dentropy \
-		  aligned-types all-pairs-distance bitonic bfs backprop
+		  aligned-types all-pairs-distance bitonic bfs backprop RAY
 
 COLOR_RED   = \033[1;31m
 COLOR_GREEN = \033[1;32m
@@ -29,13 +29,15 @@ test:$(TOTTEST)
 
 $(TOTTEST):%:
 	@printf "[%20s]" $@ ;
-	@if make -C bench/$@ NVCC_FLARG=$(NVCC_FLARG) ARCH=$(ARCH) 1>/dev/null 2>&1; then \
+	@if make -C bench/$@ NVCC_FLARG=$(NVCC_FLARG) ARCH=$(ARCH) 1>/dev/null 2>&1 ; then \
 	printf " $(COLOR_GREEN)PASS$(COLOR_NONE)\n" ; \
 	else \
 	printf " $(COLOR_RED)FAIL$(COLOR_NONE)\n"; \
 	fi
-	@cuobjdump -xptx $@.1.$(ARCH).ptx bin/$@ > /dev/null
-	@mv $@.1.$(ARCH).ptx bench/$@
+	@if [ ! -e bench/$@/$@.1.$(ARCH).ptx ] ; then \
+	cuobjdump -xptx $@.1.$(ARCH).ptx bin/$@ > /dev/null ;\
+	mv $@.1.$(ARCH).ptx bench/$@ ;\
+	fi
 
 lib:
 	$(shell [ ! -d lib ] && mkdir lib)
@@ -49,6 +51,6 @@ Dlib:
 Slib:
 	$(shell [ ! -d lib ] && mkdir lib)
 	make -C $(SRC)
-	g++ -g -O0 -D DEBUGINTE -D LOGINTE $(CPP_FLAG)
+	g++ -g -O0 -D LOGEMU -D DEBUGINTE -D LOGINTE $(CPP_FLAG)
 
 .PHONY: lib Dlib $(BENCH)

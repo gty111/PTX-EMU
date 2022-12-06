@@ -304,7 +304,10 @@ void __cudaRegisterVar(
 {
     #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    printf("%p %p %s\n",hostVar,deviceAddress,deviceName);
     #endif
+    std::string s(deviceName);
+    ptxInterpreter.constName2addr[s] = (uint64_t)hostVar;
 }
 
 cudaError_t cudaMallocManaged ( 
@@ -384,6 +387,61 @@ cudaError_t cudaThreadSynchronize (
     #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
     #endif
+    return cudaSuccess;
+}
+
+cudaError_t cudaGetDeviceCount ( 
+    int* count 
+)
+{
+    #ifdef LOGEMU
+    printf("EMU: call %s\n",__my_func__);
+    #endif
+    assert(count);
+    *count = 1;
+    return cudaSuccess;
+}
+
+
+
+cudaError_t cudaGetDeviceProperties ( 
+    cudaDeviceProp* prop, 
+    int  device 
+)
+{
+    #ifdef LOGEMU
+    printf("EMU: call %s\n",__my_func__);
+    #endif
+    prop->name[0]='\0';
+    strcpy(prop->name,"PTX-EMU");
+    prop->major = 8;
+    prop->minor = 0;
+    return cudaSuccess;
+}
+
+cudaError_t cudaSetDevice ( 
+    int  device 
+)
+{
+    #ifdef LOGEMU
+    printf("EMU: call %s\n",__my_func__);
+    #endif
+    return cudaSuccess;
+}
+
+cudaError_t cudaMemcpyToSymbol ( 
+    void* symbol, 
+    void* src, 
+    size_t count, 
+    size_t offset = 0, 
+    cudaMemcpyKind kind = cudaMemcpyHostToDevice 
+)
+{
+    #ifdef LOGEMU
+    printf("EMU: call %s\n",__my_func__);
+    printf("src:%p symbal:%p\n",src,symbol);
+    #endif
+    memcpy((void*)((uint64_t)symbol+offset),src,count);
     return cudaSuccess;
 }
 

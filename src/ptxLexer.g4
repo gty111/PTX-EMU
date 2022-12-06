@@ -27,6 +27,8 @@ MINNCTAPERSM: '.minnctapersm' ;
 
 REG: '.reg' ;
 
+CONST: '.const' ;
+
 LOCAL: '.local' ;
 
 SHARED: '.shared' ;
@@ -103,6 +105,8 @@ DOTOR: '.or';
 
 RZI: '.rzi' ;
 
+SAT: '.sat' ;
+
 /* ************ */
 
 PRAGMA: '.pragma' ;
@@ -176,6 +180,8 @@ ABS: 'abs' ;
 SIN: 'sin' ;
 
 REM: 'rem' ;
+
+RSQRT: 'rsqrt';
 
 /* ************ */
 DOUBLEQUOTES: '"' ;

@@ -44,7 +44,10 @@ class PtxInterpreter{
     void **kernelArgs;
     dim3 gridDim,blockDim;
 
-    class Symtable{ // integrate param local
+    std::map<std::string,uint64_t>constName2addr;
+
+
+    class Symtable{ // integrate param local const
         public:
         Qualifier symType;
         int byteNum;
@@ -162,18 +165,64 @@ class PtxInterpreter{
             std::printf("\n");
         }
 
+        void printReg(std::string &name,int i){
+            auto ee = name2Reg[name];
+            void *base = name2Reg[name]->addr;
+            switch(ee->name[0]){
+            case 'r': case 'S':
+            switch(ee->byteNum){
+            case 2:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
+                *(uint16_t*)((uint64_t)base+i*ee->byteNum));break;
+            case 4:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
+                *(uint32_t*)((uint64_t)base+i*ee->byteNum));break;
+            case 8:std::printf("%5s%-3d:%-16lx ",ee->name.c_str(),i,
+                *(uint64_t*)((uint64_t)base+i*ee->byteNum));break;
+            default:assert(0);
+            }
+            break;
+            case 'f':
+            switch(ee->byteNum){
+            case 4:std::printf("%5s%-3d:%-16f ",ee->name.c_str(),i,
+                *(float*)((uint64_t)base+i*ee->byteNum));break;
+            case 8:std::printf("%5s%-3d:%-16lf ",ee->name.c_str(),i,
+                *(double*)((uint64_t)base+i*ee->byteNum));break;
+            default: assert(0);
+            }
+            break;
+            case 'p':
+            std::printf("%5s%-3d:%-16d ",ee->name.c_str(),i,
+                *(uint8_t*)((uint64_t)base+i*ee->byteNum));break;
+            default:assert(0);
+            }
+            std::printf("\n");
+        }
+
         EXE_STATE exe_once(){
             if(state==RUN){
                 pc++;
                 assert(pc>=0 && pc<(*statements).size());
                 auto s = (*statements)[pc];
                 #ifdef DEBUGINTE
-                printf("PRESS ENTER...\n");
-                getchar();
+                std::string cmd,name;
+                int i;
+                while(1){
+                    std::cout << ">>> ";
+                    std::cin >> cmd;
+                    if(cmd=="s"){
+                        _exe_once(s);
+                        break;
+                    }else {
+                        extractREG(cmd,i,name);
+                        if(name2Reg[name]){
+                            printReg(name,i);
+                        }else
+                            std::cout << "unrecognized " << cmd << std::endl;
+                    }
+                }
+                
                 #endif
+                #ifndef DEBUGINTE
                 _exe_once(s);
-                #ifdef LOGINTE
-                dLog();
                 #endif
             }
             return state;
@@ -664,7 +713,16 @@ class PtxInterpreter{
                 return;
             }
             case S_SQRT:{
-                assert(0);
+                auto ss = (StatementContext::SQRT*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->sqrtOp[0],ss->sqrtQualifier);
+
+                // op1
+                void *op = getOperandAddr(ss->sqrtOp[1],ss->sqrtQualifier);
+
+                // exe sqrt
+                sqrt(to,op,ss->sqrtQualifier);
                 return;
             }
             case S_COS:{
@@ -719,7 +777,17 @@ class PtxInterpreter{
                 return;
             }
             case S_ABS:{
-                assert(0);
+                auto ss = (StatementContext::ABS*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->absOp[0],ss->absQualifier);
+
+                // op1
+                void *op0 = getOperandAddr(ss->absOp[1],ss->absQualifier);
+
+                // exe abs
+                abs(to,op0,ss->absQualifier);
+
                 return;
             }
             case S_SIN:{
@@ -743,6 +811,20 @@ class PtxInterpreter{
 
                 return;
             }
+            case S_RSQRT:{
+                auto ss = (StatementContext::RSQRT*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->rsqrtOp[0],ss->rsqrtQualifier);
+
+                // op1
+                void *op = getOperandAddr(ss->rsqrtOp[1],ss->rsqrtQualifier);
+
+                // exe rsqrt
+                rsqrt(to,op,ss->rsqrtQualifier);
+
+                return;
+            }
             default: assert(0);
             }
         }
@@ -762,7 +844,7 @@ class PtxInterpreter{
             case Q_S16:case Q_U16:case Q_B16:
             t_imm->data.u16 = stoi(s,0,0);
             break;
-            case Q_S8:case Q_U8:case Q_B8:
+            case Q_S8:case Q_U8:case Q_B8:case Q_PRED:
             t_imm->data.u8 = stoi(s,0,0);
             break;
             case Q_F64:
@@ -848,8 +930,7 @@ class PtxInterpreter{
                     return &((*name2Share)[((OperandContext::VAR*)op.operand)->varName]->val);
                 }else if(name2Sym[var->varName]){
                     return &(name2Sym[var->varName]->val);
-                }
-                else assert(0);
+                }else assert(0);
             }else if(op.opType==O_VEC){
                 PtxInterpreter::VEC *tvec = new PtxInterpreter::VEC();
                 auto vecContext = (OperandContext::VEC*)op.operand;
@@ -906,7 +987,9 @@ class PtxInterpreter{
                     ret = (void*)name2Sym[fa->ID]->val;
                 }else if((*name2Share)[fa->ID]){
                     ret = (void*)(*name2Share)[fa->ID]->val;
-                }else assert(0);
+                }else {
+                    assert(0);
+                }
             }
             if(fa->offset.size()!=0){
                 setIMM(fa->offset,Q_S64);
@@ -961,6 +1044,24 @@ class PtxInterpreter{
                     return this->GridDim.z;
                 }else assert(0);
             }else assert(0);
+        }
+
+        template<typename T>
+        void _abs(void *to,void *op){
+            *(T*)to = std::abs(*(T*)op);
+        }
+
+
+        void abs(void *to,void *op,std::vector<Qualifier>&q){
+            Qualifier datatype = getDataType(q);
+            switch(datatype){
+            case Q_S16:_abs<int16_t>(to,op);return;
+            case Q_S32:_abs<int32_t>(to,op);return;
+            case Q_S64:_abs<int64_t>(to,op);return;
+            case Q_F32:_abs<float>(to,op);return;
+            case Q_F64:_abs<double>(to,op);return;
+            assert(0);
+            }
         }
 
         template<typename T>
@@ -1168,6 +1269,36 @@ class PtxInterpreter{
         }
 
         template<typename T>
+        void _sqrt(void *to,void *op){
+            *(T*)to = std::sqrt(*(T*)op);
+        }
+
+        void sqrt(void *to,void *op,std::vector<Qualifier>&q){
+            assert(getDType(q)==DFLOAT);
+            int len = getBytes(q);
+            switch(len){
+            case 4: _sqrt<float>(to,op);return;
+            case 8: _sqrt<double>(to,op);return;
+            assert(0);
+            }
+        }
+
+        template<typename T>
+        void _rsqrt(void *to,void *op){
+            *(T*)to = 1 / std::sqrt(*(T*)op);
+        }
+
+        void rsqrt(void *to,void *op,std::vector<Qualifier>&q){
+            assert(getDType(q)==DFLOAT);
+            int len = getBytes(q);
+            switch(len){
+            case 4: _rsqrt<float>(to,op);return;
+            case 8: _rsqrt<double>(to,op);return;
+            assert(0);
+            }
+        }
+
+        template<typename T>
         void _rem(void *to,void *op0,void *op1){
             *(T*)to = *(T*)op0 % *(T*)op1 ;
         }
@@ -1259,6 +1390,12 @@ class PtxInterpreter{
             case Q_S64:
             _neg<int64_t>(to,op0);
             return;
+            case Q_F32:
+            _neg<float>(to,op0);
+            return;
+            case Q_F64:
+            _neg<double>(to,op0);
+            return;
             default:assert(0);
             }
         }
@@ -1267,7 +1404,8 @@ class PtxInterpreter{
             for(auto e:q){
                 switch(e){
                 case Q_EQ:case Q_NE:case Q_LT:case Q_LE:case Q_GT:
-                case Q_GE:case Q_LO:case Q_HI:case Q_LTU:
+                case Q_GE:case Q_LO:case Q_HI:case Q_LTU:case Q_LEU:
+                case Q_GEU:case Q_NEU:case Q_GTU:
                 return e;
                 }
             }
@@ -1323,12 +1461,12 @@ class PtxInterpreter{
                     return;
                 }
                 case 4:{
-                    assert(dtype==DINT);
+                    //assert(dtype==DINT); TODO float comp
                     _setp_eq<uint32_t>(to,op0,op1);
                     return;
                 }
                 case 8:{
-                    assert(dtype==DINT);
+                    //assert(dtype==DINT); TODO double comp
                     _setp_eq<uint64_t>(to,op0,op1);
                     return;
                 }
@@ -1336,6 +1474,7 @@ class PtxInterpreter{
                 }
                 return;
             }
+            case Q_NEU:
             case Q_NE:{ 
                 switch(len){
                 case 1: {
@@ -1349,12 +1488,12 @@ class PtxInterpreter{
                     return;
                 }
                 case 4:{
-                    assert(dtype==DINT);
+                    //assert(dtype==DINT); TODO float comp
                     _setp_ne<uint32_t>(to,op0,op1);
                     return;
                 }
                 case 8:{
-                    assert(dtype==DINT);
+                    //assert(dtype==DINT); TODO double comp
                     _setp_ne<uint64_t>(to,op0,op1);
                     return;
                 }
@@ -1362,7 +1501,8 @@ class PtxInterpreter{
                 }
                 return;
             }
-            case Q_LTU:{
+            case Q_LTU:
+            case Q_LT:{
                 switch(len){
                 case 1: {
                     assert(dtype==DINT);
@@ -1400,50 +1540,12 @@ class PtxInterpreter{
                         else
                             _setp_lt<uint64_t>(to,op0,op1);
                     }else assert(0);
-                    return;
                 }
                 default:assert(0);
                 }
                 return;
             }
-            case Q_LT:{
-                switch(len){
-                case 1: {
-                    assert(dtype==DINT);
-                    if(Signed(datatype))
-                        _setp_lt<int8_t>(to,op0,op1);
-                    else 
-                        _setp_lt<uint8_t>(to,op0,op1);
-                    return;
-                }
-                case 2:{
-                    assert(dtype==DINT);
-                    if(Signed(datatype))
-                        _setp_lt<int16_t>(to,op0,op1);
-                    else 
-                        _setp_lt<uint16_t>(to,op0,op1);
-                    return;
-                }
-                case 4:{
-                    assert(dtype==DINT);
-                    if(Signed(datatype))
-                        _setp_lt<int32_t>(to,op0,op1);
-                    else
-                        _setp_lt<uint32_t>(to,op0,op1);
-                    return;
-                }
-                case 8:{
-                    assert(dtype==DINT);
-                    if(Signed(datatype))
-                        _setp_lt<int64_t>(to,op0,op1);
-                    else
-                        _setp_lt<uint64_t>(to,op0,op1);
-                    return;
-                }
-                default:assert(0);
-                }
-                return;
-            }
+            case Q_LEU:
             case Q_LE:{
                 switch(len){
                 case 1: {
@@ -1463,25 +1565,32 @@ class PtxInterpreter{
                     return;
                 }
                 case 4:{
-                    assert(dtype==DINT);
-                    if(Signed(datatype))
-                        _setp_le<int32_t>(to,op0,op1);
-                    else
-                        _setp_le<uint32_t>(to,op0,op1);
+                    if(dtype==DFLOAT){
+                        _setp_le<float>(to,op0,op1);
+                    }else if(dtype==DINT){
+                        if(Signed(datatype))
+                            _setp_le<int32_t>(to,op0,op1);
+                        else
+                            _setp_le<uint32_t>(to,op0,op1);
+                    }else assert(0);
                     return;
                 }
                 case 8:{
-                    assert(dtype==DINT);
-                    if(Signed(datatype))
-                        _setp_le<int64_t>(to,op0,op1);
-                    else
-                        _setp_le<uint64_t>(to,op0,op1);
+                    if(dtype==DFLOAT){
+                        _setp_le<double>(to,op0,op1);
+                    }else if(dtype==DINT){
+                        if(Signed(datatype))
+                            _setp_le<int64_t>(to,op0,op1);
+                        else
+                            _setp_le<uint64_t>(to,op0,op1);
+                    }else assert(0);
                     return;
                 }
                 default:assert(0);
                 }
                 return;
             }
+            case Q_GEU:
             case Q_GE:{
                 switch(len){
                 case 1: {
@@ -1526,6 +1635,7 @@ class PtxInterpreter{
                 }
                 return;
             }
+            case Q_GTU:
             case Q_GT:{
                 switch(len){
                 case 1: {
@@ -1545,19 +1655,25 @@ class PtxInterpreter{
                     return;
                 }
                 case 4:{
-                    assert(dtype==DINT);
-                    if(Signed(datatype))
-                        _setp_gt<int32_t>(to,op0,op1);
-                    else
-                        _setp_gt<uint32_t>(to,op0,op1);
+                    if(dtype==DFLOAT){
+                        _setp_gt<float>(to,op0,op1);
+                    }else if(dtype==DINT){
+                        if(Signed(datatype))
+                            _setp_gt<int32_t>(to,op0,op1);
+                        else
+                            _setp_gt<uint32_t>(to,op0,op1);
+                    }else assert(0);
                     return;
                 }
                 case 8:{
-                    assert(dtype==DINT);
-                    if(Signed(datatype))
-                        _setp_gt<int64_t>(to,op0,op1);
-                    else
-                        _setp_gt<uint64_t>(to,op0,op1);
+                    if(dtype==DFLOAT){
+                        _setp_gt<double>(to,op0,op1);
+                    }else if(dtype==DINT){
+                        if(Signed(datatype))
+                            _setp_gt<int64_t>(to,op0,op1);
+                        else
+                            _setp_gt<uint64_t>(to,op0,op1);
+                    }else assert(0);
                     return;
                 }
                 default:assert(0);
@@ -2050,6 +2166,23 @@ class PtxInterpreter{
     void funcInterpreter(){
         std::map<std::string,PtxInterpreter::Symtable*>name2Sym;
         std::map<std::string,int>label2pc;
+
+        // setup symbol for const
+        for(auto e:ptxContext->ptxStatements){
+            assert(e.statementType==S_CONST);
+            Symtable *s = new Symtable();
+            auto st = (StatementContext::CONST*)e.statement;
+            assert(st->constDataType.size()==1);
+            s->name = st->constName;
+            s->symType = st->constDataType.back();
+            s->elementNum = st->constSize;
+            s->byteNum = Q2bytes(st->constDataType.back());
+            s->val = constName2addr[s->name];
+            assert(s->val);
+            name2Sym[s->name] = s;
+        }
+
+
         // setup symbol for kernel args
         for(int i=0;i<kernelContext->kernelParams.size();i++){
             // temporily ignore align

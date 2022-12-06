@@ -19,6 +19,23 @@
 using namespace ptxparser;
 using namespace antlr4;
 
+void extractREG(std::string s,int &idx,std::string &name){
+  int ret = 0;
+  for(char c:s){
+    if(c>='0'&&c<='9'){
+      ret = ret*10 + c - '0';
+    }
+  }
+  idx = ret;
+  for(int i=0;i<s.size();i++){
+    if((s[i]>='0'&&s[i]<='9')){
+      name = s.substr(0,i);
+      return;
+    }
+  }
+  name = s;
+}
+
 enum Qualifier{
   Q_U64,
   Q_U32,
@@ -39,6 +56,7 @@ enum Qualifier{
   Q_S64,
   Q_V2,
   Q_V4,
+  Q_CONST,
   Q_PARAM,
   Q_GLOBAL,
   Q_LOCAL,
@@ -73,7 +91,8 @@ enum Qualifier{
   Q_DOTADD,
   Q_GEU,
   Q_RZI,
-  Q_DOTOR
+  Q_DOTOR,
+  Q_SAT
 };
 
 std::string Q2s(Qualifier q){
@@ -97,6 +116,7 @@ std::string Q2s(Qualifier q){
     case Q_S64:return ".s64";
     case Q_V2:return ".v2";
     case Q_V4:return ".v4";
+    case Q_CONST:return ".const";
     case Q_PARAM:return ".param";
     case Q_GLOBAL:return ".global";
     case Q_LOCAL:return ".local";
@@ -132,12 +152,14 @@ std::string Q2s(Qualifier q){
     case Q_GEU:return ".geu";
     case Q_RZI:return ".rzi";
     case Q_DOTOR:return ".or";
+    case Q_SAT:return ".sat";
     default:assert(0);
     }
 }
 
 enum StatementType{
   S_REG,
+  S_CONST,
   S_SHARED,
   S_LOCAL,
   S_DOLLOR,
@@ -177,13 +199,15 @@ enum StatementType{
   S_XOR,
   S_ABS,
   S_SIN,
-  S_REM
+  S_REM,
+  S_RSQRT
 };
 
 std::string S2s(StatementType s){
     switch (s)
     {
     case S_REG:return "reg";
+    case S_CONST:return "const";
     case S_SHARED:return "shared";
     case S_LOCAL:return "local";
     case S_DOLLOR:return "$";
@@ -224,6 +248,7 @@ std::string S2s(StatementType s){
     case S_ABS:return "abs";
     case S_SIN:return "sin";
     case S_REM:return "rem";
+    case S_RSQRT:return "rsqrt";
     default:assert(0);
     }
 }
@@ -315,6 +340,13 @@ class StatementContext{
         std::vector<Qualifier> regDataType;
         std::string regName;
         int regNum;
+    };
+    class CONST {
+      public:
+        int constAlign;
+        std::vector<Qualifier> constDataType;
+        std::string constName;
+        int constSize;
     };
     class SHARED {
       public:
@@ -517,6 +549,11 @@ class StatementContext{
         std::vector<Qualifier> remQualifier;
         OperandContext remOp[3];
     };
+    class RSQRT{
+      public:
+        std::vector<Qualifier> rsqrtQualifier;
+        OperandContext rsqrtOp[2];
+    };
 };
 
 
@@ -552,17 +589,18 @@ class PtxContext{
     int ptxAddressSize; 
 
     std::vector<KernelContext> ptxKernels;
+    std::vector<StatementContext> ptxStatements;
 };
 
 class PtxListener : public ptxParserBaseListener{
   public: 
     PtxContext ptxContext;
-    KernelContext *kernelContext;
-    ParamContext *paramContext;
+    KernelContext *kernelContext=nullptr;
+    ParamContext *paramContext=nullptr;
     std::queue<Qualifier> qualifier;
     StatementType statementType;
     StatementContext statementContext;
-    void *statement;
+    void *statement=nullptr;
     std::queue<OperandContext*> op;
 
     /* helper function */
@@ -601,23 +639,6 @@ class PtxListener : public ptxParserBaseListener{
           std::printf("%s %p\n",S2s(stat.statementType).c_str(),stat.statement);
         }
       }
-    }
-
-    void extractREG(std::string s,int &idx,std::string &name){
-      int ret = 0;
-      for(char c:s){
-        if(c>='0'&&c<='9'){
-          ret = ret*10 + c - '0';
-        }
-      }
-      idx = ret;
-      for(int i=0;i<s.size();i++){
-        if((s[i]>='0'&&s[i]<='9')){
-          name = s.substr(0,i);
-          return;
-        }
-      }
-      name = s;
     }
 
     void fetchOperand(OperandContext &oc){
@@ -797,6 +818,8 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.push(Q_V2);
       }else if(ctx->V4()){
         qualifier.push(Q_V4);
+      }else if(ctx->CONST()){
+        qualifier.push(Q_CONST);
       }else if(ctx->PARAM()){
         qualifier.push(Q_PARAM);
       }else if(ctx->GLOBAL()){
@@ -867,6 +890,8 @@ class PtxListener : public ptxParserBaseListener{
         qualifier.push(Q_RZI);
       }else if(ctx->DOTOR()){
         qualifier.push(Q_DOTOR);
+      }else if(ctx->SAT()){
+        qualifier.push(Q_SAT);
       }else assert(0 && "some qualifier not recognized!\n");
 
       #ifdef LOG
@@ -955,7 +980,10 @@ class PtxListener : public ptxParserBaseListener{
       assert(op.size()==0);
       statementContext.statementType = statementType;
       statementContext.statement = statement;
-      kernelContext->kernelStatements.push_back(statementContext);
+      if(kernelContext)
+        kernelContext->kernelStatements.push_back(statementContext);
+      else
+        ptxContext.ptxStatements.push_back(statementContext); // const decl
       #ifdef LOG
       std::cout << __func__ << std::endl;
       #endif
@@ -1032,6 +1060,41 @@ class PtxListener : public ptxParserBaseListener{
       #endif
     }
 
+    void enterConstStatement(ptxParser::ConstStatementContext *ctx) override{
+      statement = new StatementContext::CONST();
+      #ifdef LOG
+      std::cout << __func__ << std::endl;
+      #endif
+    }
+
+    void exitConstStatement(ptxParser::ConstStatementContext *ctx) override{
+      auto st = (StatementContext::CONST *)statement;
+
+      /* align */
+      st->constAlign = stoi(ctx->DIGITS(0)->getText());
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->constDataType.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* ID */
+      st->constName = ctx->ID()->getText();
+
+      /* size */
+      if(ctx->DIGITS(1))
+        st->constSize = stoi(ctx->DIGITS(1)->getText());
+      else 
+        st->constSize = 1;
+
+      /* end */
+      statementType = S_CONST;
+      #ifdef LOG
+      std::cout << __func__ << std::endl;
+      #endif
+    }
+
     void enterLocalStatement(ptxParser::LocalStatementContext *ctx) override { 
       statement = new StatementContext::LOCAL();
       #ifdef LOG
@@ -1054,7 +1117,10 @@ class PtxListener : public ptxParserBaseListener{
       st->localName = ctx->ID()->getText();
 
       /* size */
-      st->localSize = stoi(ctx->DIGITS(1)->getText());
+      if(ctx->DIGITS(1))
+        st->localSize = stoi(ctx->DIGITS(1)->getText());
+      else 
+        st->localSize = 1;
 
       /* end */
       statementType = S_LOCAL;
@@ -2041,6 +2107,35 @@ class PtxListener : public ptxParserBaseListener{
 
       /* end */
       statementType = S_SIN; 
+      #ifdef LOG
+      std::cout << __func__ << std::endl;
+      #endif
+    }
+
+    void enterRsqrtStatement(ptxParser::RsqrtStatementContext *ctx) override{
+      statement = new StatementContext::RSQRT();
+      #ifdef LOG
+      std::cout << __func__ << std::endl;
+      #endif
+    }
+
+    void exitRsqrtStatement(ptxParser::RsqrtStatementContext *ctx) override{
+      auto st = (StatementContext::RSQRT *)statement;
+
+      /* qualifier */
+      while(qualifier.size()){
+        st->rsqrtQualifier.push_back(qualifier.front());
+        qualifier.pop();
+      }
+
+      /* op2 */
+      for(int i=0;i<2;i++){
+        fetchOperand(st->rsqrtOp[i]);
+      }
+
+      /* end */
+      statementType = S_RSQRT; 
+
       #ifdef LOG
       std::cout << __func__ << std::endl;
       #endif

@@ -9,7 +9,7 @@ options {
 	tokenVocab = ptxLexer;
 }
 
-ast : versionDes targetDes addressDes kernels ;
+ast : versionDes targetDes addressDes statements? kernels ;
 
 versionDes : VERSION DIGITS DOT DIGITS ;
 targetDes : TARGET ID ;
@@ -49,6 +49,7 @@ qualifier : U64
           | S64
           | V2
           | V4
+          | CONST
           | PARAM
           | GLOBAL
           | LOCAL
@@ -84,6 +85,7 @@ qualifier : U64
           | GEU
           | RZI
           | DOTOR
+          | SAT
           ;
 
 params : param COMMA params
@@ -102,6 +104,7 @@ statements : statement statements
 
 statement : compoundStatement
           | regStatement
+          | constStatement
           | sharedStatement
           | localStatement
           | dollorStatement
@@ -142,9 +145,11 @@ statement : compoundStatement
           | absStatement
           | sinStatement
           | remStatement
+          | rsqrtStatement
           ;
 
 regStatement : REG qualifier reg (LESS DIGITS GREATER)? SEMI ;
+constStatement : CONST ALIGN DIGITS qualifier ID (LeftBracket DIGITS RightBracket)? SEMI ;
 sharedStatement : SHARED ALIGN DIGITS qualifier ID (LeftBracket DIGITS RightBracket)? SEMI ;
 localStatement : LOCAL ALIGN DIGITS qualifier ID (LeftBracket DIGITS RightBracket)? SEMI ;
 dollorStatement : DOLLOR ID COLON ;
@@ -188,6 +193,7 @@ xorStatement : XOR qualifier* operandThree SEMI ;
 absStatement : ABS qualifier* operandTwo SEMI ;
 sinStatement : SIN qualifier* operandTwo SEMI ;
 remStatement : REM qualifier* operandThree SEMI ;
+rsqrtStatement : RSQRT qualifier* operandTwo SEMI ;
 
 operandTwo : operand COMMA operand ;
 operandThree : operand COMMA operand COMMA operand;
