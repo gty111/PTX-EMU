@@ -47,7 +47,6 @@ cd ${PTX_EMU_PATH}
 
 if [ ! -f lib/libcudart.so.11.0 ]
 then
-    make lib
     make minitest
 fi
 

@@ -5,7 +5,7 @@ LINK_DIR = ${PTX_EMU_PATH}/antlr4/antlr4-cpp-runtime-4.11.1-source/run/usr/local
 ARCH = sm_80
 NVCC_FLARG = "-arch=$(ARCH) -use_fast_math -lcudart"
 LIB_OUT = libcudart.so.11.0
-CPP_FLAG = -std=c++2a -pthread -fPIC -shared -Wl,--version-script=linux-so-version.txt \
+CPP_FLAG = -std=c++2a -pthread -fPIC -shared -Wl,--version-script=$(SRC)/linux-so-version.txt \
 	$(SRC)/PTXEMU.cpp $(SRC)/build/*.cpp $(addprefix -I,$(INCLUDE_DIR)) $(addprefix -L,$(LINK_DIR)) \
 	-lantlr4-runtime -o lib/$(LIB_OUT) 
 
@@ -23,9 +23,9 @@ COLOR_RED   = \033[1;31m
 COLOR_GREEN = \033[1;32m
 COLOR_NONE  = \033[0m
 
-minitest:$(MINITEST)
+minitest:lib $(MINITEST)
 
-test:$(TOTTEST) 
+test:lib $(TOTTEST) 
 
 $(TOTTEST):%:
 	@printf "[%20s]" $@ ;
