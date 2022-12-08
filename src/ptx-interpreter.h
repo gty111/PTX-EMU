@@ -39,6 +39,10 @@ uint64_t SHMEMADDR = 0; // log SHMEMADDR high 32bits
 
 #ifdef DEBUGINTE
 bool sync_thread = 0;
+std::set<int>breakpoint;
+bool trap(int pc){
+    return breakpoint.count(pc);
+}
 #endif
 
 class PtxInterpreter{
@@ -216,7 +220,7 @@ class PtxInterpreter{
             while(state==RUN&&!sync_thread){
                 std::cout << ">>> ";
                 std::cin.getline(input,255);
-                if(input[0]=='s'||input[0]=='\0'){
+                if(input[0]=='S'||input[0]=='\0'){
                     int steps = 1;
                     if(strlen(input)!=1){
                         if(sscanf(input,"s %d",&steps)!=1){
@@ -229,22 +233,52 @@ class PtxInterpreter{
                         else break;
                     }
                     
+                }else if(input[0]=='B'){
+                    int b_pc;
+                    if(sscanf(input,"B %d",&b_pc)!=1){
+                        printf("unrecognized PC\n");
+                    }else if(b_pc<0||b_pc>(*statements).size()){
+                        printf("invalid PC:valid is [0,%d]\n",(*statements).size()-1);
+                    }else{
+                        breakpoint.insert(b_pc);
+                    }
+                }else if(input[0]=='D'){
+                    int d_pc;
+                    if(sscanf(input,"D %d",&d_pc)!=1){
+                        printf("unrecognized PC\n");
+                    }else if(d_pc<0||d_pc>(*statements).size()){
+                        printf("invalid PC:valid is [0,%d]\n",(*statements).size()-1);
+                    }else{
+                        breakpoint.erase(d_pc);
+                    }
+                }else if(strcmp(input,"bp")==0){
+                    for(auto e:breakpoint){
+                        printf("%d\n",e);
+                    }
                 }else if(strcmp(input,"log")==0){
                     log();
                 }else if(strcmp(input,"reg")==0){
                     dLog();
                 }else if(strcmp(input,"q")==0){
                     exit(0);
-                }else if(strcmp(input,"Sync")==0){
+                }else if(strcmp(input,"sync")==0){
                     sync_thread = 1;
                     pc --;
-                }else if(strcmp(input,"h")==0){
-                    printf( "s [steps]:exe steps\n"
-                            "log:print current thread index\n"
-                            "reg:print reg info\n"
-                            "h:get help info\n"
-                            "[reg]:(eg. rd16)print spec reg info\n"
-                            "Sync:run util all threads at bar\n");
+                }else if(strcmp(input,"run")==0){
+                    pc --;
+                    break;
+                }
+                else if(strcmp(input,"h")==0){
+                    printf( "S [steps]: exe steps\n"
+                            "B [pc]   : set breakpoint at pc\n"
+                            "D [pc]   : remove breakpoint at pc\n"
+                            "bp       : show breakpoint\n"
+                            "log      : print current thread index\n"
+                            "reg      : print reg info\n"
+                            "run      : run util reach breakpoint\n"
+                            "[reg]    : print spec reg info(eg. rd16)\n"
+                            "sync     : run util all threads at bar\n"
+                            "h        : get help info\n");
                 }else {
                     cmd = input;
                     extractREG(cmd,i,name);
@@ -261,7 +295,7 @@ class PtxInterpreter{
             if(state==RUN){
                 pc++;
                 #ifdef DEBUGINTE
-                if(!sync_thread)
+                if( !sync_thread&&( breakpoint.size()==0||(breakpoint.size()&&trap(pc)) ) )
                     debugMode();
                 else
                     _exe_once();
@@ -1817,18 +1851,23 @@ class PtxInterpreter{
         }
 
         template<typename T1,typename T2>
-        void __cvt(void *to,void *from){
-            *(T1*)to = *(T2*)from;
+        void __cvt(void *to,void *from,bool IFSAT=0){
+            if(IFSAT){
+                if(*(T2*)from<0 || *(T2*)from!=*(T2*)from) *(T1*)to = 0;
+                else if(*(T2*)from>1) *(T2*)to = 1;
+                else *(T1*)to = *(T2*)from;
+            }else
+                *(T1*)to = *(T2*)from;
         }
 
         template<typename T>
-        void _cvt(void *to,void *from,int bitnum,DTYPE dtype){
+        void _cvt(void *to,void *from,int bitnum,DTYPE dtype,bool IFSAT=0){
             switch(bitnum){
             case 8: {
                 if(dtype==DINT)
                     __cvt<T,uint64_t>(to,from);
                 else if(dtype==DFLOAT)
-                    __cvt<T,double>(to,from);
+                    __cvt<T,double>(to,from,IFSAT);
                 else assert(0);
                 return;
             }
@@ -1836,7 +1875,7 @@ class PtxInterpreter{
                 if(dtype==DINT)
                     __cvt<T,uint32_t>(to,from);
                 else if(dtype==DFLOAT)
-                    __cvt<T,float>(to,from);
+                    __cvt<T,float>(to,from,IFSAT);
                 else assert(0);
                 return;
             }
@@ -1873,7 +1912,8 @@ class PtxInterpreter{
                     if(dtype[0]==DINT)
                         _cvt<uint64_t>(to,from,bitnum[1],dtype[1]);
                     else if(dtype[0]==DFLOAT)
-                        _cvt<double>(to,from,bitnum[1],dtype[1]);
+                        _cvt<double>(to,from,bitnum[1],dtype[1],
+                            QvecHasQ(q,Q_SAT)&&dtype[0]==DFLOAT&&dtype[1]==DFLOAT);
                     else assert(0);
                     return;
                 }
@@ -1881,7 +1921,8 @@ class PtxInterpreter{
                     if(dtype[0]==DINT)
                         _cvt<uint32_t>(to,from,bitnum[1],dtype[1]);
                     else if(dtype[0]==DFLOAT)
-                        _cvt<float>(to,from,bitnum[1],dtype[1]);
+                        _cvt<float>(to,from,bitnum[1],dtype[1],
+                            QvecHasQ(q,Q_SAT)&&dtype[0]==DFLOAT&&dtype[1]==DFLOAT);
                     else assert(0);
                     return;
                 }
@@ -1897,7 +1938,6 @@ class PtxInterpreter{
                 }
                 default: assert(0);
             }
-            
         }
 
         template<typename T>
@@ -2272,6 +2312,9 @@ class PtxInterpreter{
             auto e = kernelContext->kernelStatements[i];
             if(e.statementType==S_DOLLOR){
                 auto s = (StatementContext::DOLLOR*)e.statement;
+                #ifdef LOGINTE
+                printf("%d:%s\n",i,s->dollorName.c_str());
+                #endif
                 label2pc[s->dollorName] = i;
             }
         }

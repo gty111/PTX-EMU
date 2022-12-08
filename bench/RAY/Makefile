@@ -5,4 +5,4 @@ RAY: EasyBMP.cpp makebmp.cpp rayTracing.cu
 
 .PHONY:RAY
 
-# TODO result check
+# TODO result check(you can view output.bmp to check)
