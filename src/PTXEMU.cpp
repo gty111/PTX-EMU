@@ -148,6 +148,7 @@ cudaError_t cudaMalloc(
     memAlloc[(uint64_t)p] = 1;
     #ifdef LOGEMU
     printf("EMU: call %s\n",__my_func__);
+    printf("EMU: malloc %lx\n",*p);
     #endif
     return cudaSuccess;
 }
@@ -442,6 +443,17 @@ cudaError_t cudaMemcpyToSymbol (
     printf("src:%p symbal:%p\n",src,symbol);
     #endif
     memcpy((void*)((uint64_t)symbol+offset),src,count);
+    return cudaSuccess;
+}
+
+cudaError_t cudaGetDevice
+(
+    int *device
+)
+{
+    #ifdef LOGEMU
+    printf("EMU: call %s\n",__my_func__);
+    #endif
     return cudaSuccess;
 }
 

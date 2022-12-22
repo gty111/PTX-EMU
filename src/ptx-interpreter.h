@@ -9,6 +9,8 @@
 
 #include<driver_types.h>
 #include<cmath>
+#include <signal.h>
+#include <signal.h>
 
 #include "ptx-semantic.h"
 
@@ -42,6 +44,10 @@ bool sync_thread = 0;
 std::set<int>breakpoint;
 bool trap(int pc){
     return breakpoint.count(pc);
+}
+bool run = 0;
+bool IFLOG(){
+    return !run && !sync_thread;
 }
 #endif
 
@@ -214,6 +220,8 @@ class PtxInterpreter{
 
         #ifdef DEBUGINTE
         void debugMode(){
+            run = 0;
+            sync_thread = 0;
             std::string cmd,name;
             int i;
             char input[256];
@@ -251,6 +259,13 @@ class PtxInterpreter{
                     }else{
                         breakpoint.erase(d_pc);
                     }
+                }else if(input[0]=='X'){
+                    long pointer;
+                    if(sscanf(input,"X %lx",&pointer)!=1){
+                        printf("unrecognized pointer\n");
+                    }else{
+                        printf("%lx : %lx\n",pointer,*(uint64_t*)pointer);
+                    }
                 }else if(strcmp(input,"bp")==0){
                     for(auto e:breakpoint){
                         printf("%d\n",e);
@@ -265,6 +280,7 @@ class PtxInterpreter{
                     sync_thread = 1;
                     pc --;
                 }else if(strcmp(input,"run")==0){
+                    run = 1;
                     pc --;
                     break;
                 }
@@ -295,7 +311,7 @@ class PtxInterpreter{
             if(state==RUN){
                 pc++;
                 #ifdef DEBUGINTE
-                if( !sync_thread&&( breakpoint.size()==0||(breakpoint.size()&&trap(pc)) ) )
+                if((!run && !sync_thread)||(breakpoint.size()&&trap(pc))  )
                     debugMode();
                 else
                     _exe_once();
@@ -311,6 +327,7 @@ class PtxInterpreter{
             assert(pc>=0 && pc<(*statements).size());
             auto s = (*statements)[pc];
             #ifdef LOGINTE
+            if(IFLOG())
             std::printf("INTE: %s\n",S2s(s.statementType).c_str());
             #endif
             switch(s.statementType){
@@ -444,6 +461,14 @@ class PtxInterpreter{
                     }
                 }else{
                     mov(from,to,ss->ldQualifier);
+                }
+                // special case occur in cfd
+                if(QvecHasQ(ss->ldQualifier,Q_S32)&&ss->ldOp[0].opType==O_REG){
+                    auto reg = (OperandContext::REG*)ss->ldOp[0].operand;
+                    if(reg->regMajorName[1]=='d'){
+                        *(int64_t*)to <<= 32;
+                        *(int64_t*)to >>= 32;
+                    }
                 }
                 return;
             }
@@ -936,7 +961,8 @@ class PtxInterpreter{
             case Q_F32:
             assert(s.size()==10&&(s[1]=='f'||s[1]=='F'));
             s[1] = 'x';
-            *(uint32_t*)&(t_imm->data.f32) = stoi(s,0,0);
+            // when using stoi and facing input 0xBF000000 it will throw std::out_of_range
+            *(uint32_t*)&(t_imm->data.f32) = (uint32_t)stol(s,0,0); 
             break;
             default:assert(0);
             }
@@ -1027,6 +1053,7 @@ class PtxInterpreter{
         void *getRegAddr(OperandContext::REG *regContext){
             if(regContext->regMinorName.size()==1){
                 #ifdef LOGINTE
+                if(IFLOG())
                 std::printf("INTE: access %s.%s\n",
                     regContext->regMajorName.c_str(),regContext->regMinorName.c_str());
                 #endif
@@ -1035,6 +1062,7 @@ class PtxInterpreter{
                 return &t;
             }else{
                 #ifdef LOGINTE
+                if(IFLOG())
                 std::printf("INTE: access %s%d\n",
                     regContext->regMajorName.c_str(),regContext->regIdx);
                 #endif
@@ -1062,6 +1090,7 @@ class PtxInterpreter{
                 }
             }else{
                 #ifdef LOGINTE
+                if(IFLOG())
                 printf("INTE: access %s\n",fa->ID.c_str());
                 #endif
                 if(name2Sym[fa->ID]){
@@ -2223,6 +2252,7 @@ class PtxInterpreter{
             if(exitThreadNum==threadNum)return EXIT;
             if(barThreadNum==threadNum){
                 #ifdef LOGINTE
+                if(IFLOG())
                 printf("INTE: bar.sync BlockIdx(%d,%d,%d)\n",
                     blockIdx.x,blockIdx.y,blockIdx.z);
                 #endif
@@ -2258,7 +2288,13 @@ class PtxInterpreter{
 
     void launchPtxInterpreter(PtxContext &ptx,std::string &kernel,void **args,
         dim3 &gridDim,dim3 &blockDim){
-
+      
+      #ifdef LOGINTE
+      printf("INTE: launch kernel %s\n",kernel.c_str());
+      #endif
+      #ifdef DEBUGINTE
+      run = 0;
+      #endif
       // init 
       ptxContext = &ptx;
       kernelArgs = args;
@@ -2310,9 +2346,13 @@ class PtxInterpreter{
         // setup label to jump
         for(int i=0;i<kernelContext->kernelStatements.size();i++){
             auto e = kernelContext->kernelStatements[i];
+            #ifdef LOGINTE
+            printf("INTE: %d %s\n",i,S2s(e.statementType).c_str());
+            #endif
             if(e.statementType==S_DOLLOR){
                 auto s = (StatementContext::DOLLOR*)e.statement;
                 #ifdef LOGINTE
+                if(IFLOG())
                 printf("%d:%s\n",i,s->dollorName.c_str());
                 #endif
                 label2pc[s->dollorName] = i;
