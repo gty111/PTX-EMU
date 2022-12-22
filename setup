@@ -45,10 +45,12 @@ cd ${PTX_EMU_PATH}
 
 [ ! -d bin ] && mkdir bin
 
+export PTX_EMU_SUCCESS=1
+echo "setup successfully!"
+
 if [ ! -f lib/libcudart.so.11.0 ]
 then
     make minitest
 fi
 
-export PTX_EMU_SUCCESS=1
-echo "setup successfully!"
+
