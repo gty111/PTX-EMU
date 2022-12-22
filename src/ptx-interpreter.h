@@ -879,7 +879,20 @@ class PtxInterpreter{
                 return;
             }
             case S_XOR:{
-                assert(0);
+                auto ss = (StatementContext::XOR*)s.statement;
+
+                // op0
+                void *to = getOperandAddr(ss->xorOp[0],ss->xorQualifier);
+
+                // op1
+                void *op0 = getOperandAddr(ss->xorOp[1],ss->xorQualifier);
+
+                // op2
+                void *op1 = getOperandAddr(ss->xorOp[2],ss->xorQualifier);
+
+                // exe rem
+                Xor(to,op0,op1,ss->xorQualifier);
+                
                 return;
             }
             case S_ABS:{
@@ -1404,6 +1417,22 @@ class PtxInterpreter{
             switch(len){
             case 4: _rsqrt<float>(to,op);return;
             case 8: _rsqrt<double>(to,op);return;
+            assert(0);
+            }
+        }
+
+        template<typename T>
+        void _xor(void *to,void *op0,void *op1){
+            *(T*)to = *(T*)op0 ^ *(T*)op1;
+        }
+
+        void Xor(void *to,void *op0, void *op1,std::vector<Qualifier>&q){
+            int len = getBytes(q);
+            switch(len){
+            case 1:_xor<uint8_t>(to,op0,op1);return;
+            case 2:_xor<uint16_t>(to,op0,op1);return;
+            case 4:_xor<uint32_t>(to,op0,op1);return;
+            case 8:_xor<uint64_t>(to,op0,op1);return;
             assert(0);
             }
         }

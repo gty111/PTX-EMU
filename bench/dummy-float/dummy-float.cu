@@ -23,7 +23,6 @@ bool dummy_h(){
     cudaMemcpy(a_h,a_d,SIZE*sizeof(T),cudaMemcpyDeviceToHost);
 
     for(int i=0;i<SIZE;i++){
-        printf("%f\n",1e-6);
         if(fabs(a_h[i]-(i*MULNUM+ADDNUM))>1e-3){
             printf("at:%p expect:%.10lf got:%.10lf\n",&a_h[i],i*MULNUM+ADDNUM,a_h[i]);
             printf("FAIL\n");

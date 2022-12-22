@@ -17,8 +17,7 @@ MINITEST = dummy dummy-add dummy-float dummy-grid dummy-mul dummy-sub dummy-cond
 
 TOTTEST = $(MINITEST) simpleGEMM-int simpleGEMM-float simpleGEMM-double \
 		  simpleCONV-int simpleCONV-float simpleCONV-double 2Dentropy \
-		  aligned-types all-pairs-distance bitonic bfs backprop RAY cfd \
-		  dwt2d
+		  aligned-types all-pairs-distance bitonic bfs backprop RAY cfd 
 
 COLOR_RED   = \033[1;31m
 COLOR_GREEN = \033[1;32m
@@ -30,7 +29,7 @@ test:lib $(TOTTEST)
 
 $(TOTTEST):%:
 	@printf "[%20s]" $@ ;
-	@if make -C bench/$@ NVCC_FLARG=$(NVCC_FLARG) ARCH=$(ARCH)  ; then \
+	@if make -C bench/$@ NVCC_FLARG=$(NVCC_FLARG) ARCH=$(ARCH) 1>/dev/null 2>&1 ; then \
 	printf " $(COLOR_GREEN)PASS$(COLOR_NONE)\n" ; \
 	else \
 	printf " $(COLOR_RED)FAIL$(COLOR_NONE)\n"; \
