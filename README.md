@@ -53,7 +53,7 @@ make Dlib
 ```
 
 ## step
-Similar to gdb mode, you can type 'h' in step mode to get more info.
+Similar to gdb mode.
 ```
 make Slib
 ```
