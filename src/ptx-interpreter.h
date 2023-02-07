@@ -219,7 +219,26 @@ class PtxInterpreter{
         }
 
         #ifdef DEBUGINTE
+        void logHelp(){
+            printf( "------------------help info---------------------\n"
+                    "<Enter>  : exe one step\n"
+                    "S [steps]: exe steps\n"
+                    "B [pc]   : set breakpoint at pc\n"
+                    "D [pc]   : remove breakpoint at pc\n"
+                    "bp       : show breakpoint\n"
+                    "log      : print current thread index\n"
+                    "reg      : print reg info\n"
+                    "run      : run util reach breakpoint\n"
+                    "[reg]    : print spec reg info(eg. rd16)\n"
+                    "sync     : run util all threads at bar\n"
+                    "h        : get help info\n");
+        }
         void debugMode(){
+            static bool ifBegin = 0;
+            if(!ifBegin){
+                ifBegin = 1;
+                logHelp();
+            }
             run = 0;
             sync_thread = 0;
             std::string cmd,name;
@@ -231,7 +250,7 @@ class PtxInterpreter{
                 if(input[0]=='S'||input[0]=='\0'){
                     int steps = 1;
                     if(strlen(input)!=1){
-                        if(sscanf(input,"s %d",&steps)!=1){
+                        if(sscanf(input,"S %d",&steps)!=1){
                             steps = 1;
                         }
                     }
@@ -285,16 +304,7 @@ class PtxInterpreter{
                     break;
                 }
                 else if(strcmp(input,"h")==0){
-                    printf( "S [steps]: exe steps\n"
-                            "B [pc]   : set breakpoint at pc\n"
-                            "D [pc]   : remove breakpoint at pc\n"
-                            "bp       : show breakpoint\n"
-                            "log      : print current thread index\n"
-                            "reg      : print reg info\n"
-                            "run      : run util reach breakpoint\n"
-                            "[reg]    : print spec reg info(eg. rd16)\n"
-                            "sync     : run util all threads at bar\n"
-                            "h        : get help info\n");
+                    logHelp();
                 }else {
                     cmd = input;
                     extractREG(cmd,i,name);
@@ -2380,10 +2390,6 @@ class PtxInterpreter{
             #endif
             if(e.statementType==S_DOLLOR){
                 auto s = (StatementContext::DOLLOR*)e.statement;
-                #ifdef LOGINTE
-                if(IFLOG())
-                printf("%d:%s\n",i,s->dollorName.c_str());
-                #endif
                 label2pc[s->dollorName] = i;
             }
         }
