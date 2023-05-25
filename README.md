@@ -62,7 +62,7 @@ make Slib
 
 ## cuda运行时库替换
 
-cudart 为cuda运行时库(cuda runtime)，在nvcc编译过程中默认情况会静态链接cudart，而通过编译参数的修改 --cudart shared 或 -lcudart 可以实现动态链接cudart(libcudart.so)。LD_LIBRARY_PATH 为linux程序动态链接库的搜索路径，我们可以先生成fake cudart，之后将fake cudart的路径加入LD_LIBRARY_PATH来实现程序运行时链接到fake cudart。
+cudart 为cuda运行时库(cuda runtime)，在nvcc编译过程中默认情况会静态链接cudart，而通过编译参数的修改 `--cudart shared` 或 `-lcudart` 可以实现动态链接cudart(libcudart.so)。LD_LIBRARY_PATH 为linux程序动态链接库的搜索路径，我们可以先生成fake cudart，之后将fake cudart的路径加入LD_LIBRARY_PATH来实现程序运行时链接到fake cudart。
 
 ## cuda运行时模拟
 
