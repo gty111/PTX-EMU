@@ -8,8 +8,8 @@ You can use it to generate image below like on GPU.
 ![](assets/pic/output.bmp)
 
 # dependence
-- cmake 
-- make 
+- cmake (test with 3.27.2)
+- make (test with 4.3)
 - cuda (test with 11.4.4)
 - gcc (test with 10.2.0)
 
