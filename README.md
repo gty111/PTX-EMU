@@ -11,13 +11,14 @@ You can use it to generate image below like on GPU.
 - cmake 
 - make 
 - cuda
-- gcc
+- gcc (test with 10.2.0)
 
 # Usage
 
 ## Set up env
 
 ```
+export CUDA_PATH=/your-path-to-cuda
 . setup
 ```
 
