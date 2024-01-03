@@ -3,7 +3,7 @@
 
 PTX-EMU is a simple emulator for CUDA program.
 
-You can use it to generate image below like on GPU.
+You can use it to generate image by simulating rendering program.
 
 ![](assets/pic/output.bmp)
 
